@@ -1,16 +1,6 @@
-# Amount field encryption (AES-256-GCM). Generate with:
-#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-KANTONG_ENCRYPTION_KEY=
+/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+import "./.next/types/routes.d.ts";
 
-# Firebase Admin SDK service account (Firestore).
-# From Firebase Console > Project Settings > Service Accounts > Generate new private key.
-FIREBASE_PROJECT_ID=
-FIREBASE_CLIENT_EMAIL=
-# Paste the private key with literal \n for newlines (keep the quotes).
-FIREBASE_PRIVATE_KEY=""
-
-# Telegram bot (from @BotFather).
-TELEGRAM_BOT_TOKEN=
-# Random string you choose; set the same value when registering the webhook
-# with Telegram so incoming requests can be verified.
-TELEGRAM_WEBHOOK_SECRET=
+// NOTE: This file should not be edited
+// see https://nextjs.org/docs/app/api-reference/config/typescript for more information.

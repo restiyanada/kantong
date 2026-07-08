@@ -1,13 +1,25 @@
-export default function Home() {
+import { listDailyTransactions } from "@/lib/db/dailyTransactions";
+import { listSavingsTransactions } from "@/lib/db/savingsTransactions";
+import { listCertificates } from "@/lib/db/depositoCertificates";
+import { getTodayISO } from "@/lib/telegram/dateUtils";
+import { DashboardShell } from "@/components/DashboardShell";
+
+// Personal finance data — never statically cache this page.
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const [daily, savings, deposito] = await Promise.all([
+    listDailyTransactions(),
+    listSavingsTransactions(),
+    listCertificates(),
+  ]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans">
-      <main className="max-w-md rounded-lg border border-zinc-200 bg-white p-8 text-center">
-        <h1 className="text-2xl font-semibold text-zinc-900">Kantong</h1>
-        <p className="mt-2 text-zinc-600">
-          Web app views (Daily / Savings / Deposito / All) are coming in a
-          later stage. This is just the project scaffold.
-        </p>
-      </main>
-    </div>
+    <DashboardShell
+      daily={daily}
+      savings={savings}
+      deposito={deposito}
+      todayISO={getTodayISO()}
+    />
   );
 }

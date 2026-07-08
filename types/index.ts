@@ -29,7 +29,10 @@ export interface DailyTransaction {
   id: string;
   type: "income" | "expense";
   amount: string; // encrypted
+  /** Empty string while `pending` is true (category not yet picked). */
   category: DailyCategory | string;
+  /** True until the person taps a category button (PRD 5.6). */
+  pending: boolean;
   note: string;
   date: string; // YYYY-MM-DD
   createdAt: string; // ISO timestamp
