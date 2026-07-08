@@ -9,7 +9,7 @@ import type { NextRequest } from "next/server";
  */
 export const ACCESS_COOKIE_NAME = "kantong_access";
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const configuredPassword = process.env.WEB_ACCESS_PASSWORD;
   const cookieValue = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const hasAccess = Boolean(configuredPassword) && cookieValue === configuredPassword;
