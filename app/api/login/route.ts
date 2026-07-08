@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ACCESS_COOKIE_NAME } from "@/middleware";
+import { ACCESS_COOKIE_NAME } from "@/lib/accessGate";
 
 export async function POST(request: NextRequest) {
   const { password } = await request.json();
