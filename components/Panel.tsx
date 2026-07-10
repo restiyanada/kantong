@@ -6,7 +6,9 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <div className={`rounded-lg border border-[#E2E2DE] bg-white p-5 ${className}`}>
+    <div
+      className={`rounded-xl border border-[#EAEAE6] bg-white p-4 shadow-[0_1px_2px_rgba(26,27,30,0.04)] sm:p-6 ${className}`}
+    >
       {children}
     </div>
   );

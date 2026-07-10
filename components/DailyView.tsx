@@ -45,7 +45,7 @@ export function DailyView({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <BalanceCard
         label="Daily balance"
         balance={balance}
@@ -55,21 +55,23 @@ export function DailyView({
         ]}
       />
 
-      <Panel>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-[#1A1B1E]">Balance over time</h2>
-          <TimeRangeTabs value={range} onChange={setRange} />
-        </div>
-        <BalanceChart points={chartPoints} />
-      </Panel>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
+        <Panel className="lg:col-span-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-[#1A1B1E]">Balance over time</h2>
+            <TimeRangeTabs value={range} onChange={setRange} />
+          </div>
+          <BalanceChart points={chartPoints} />
+        </Panel>
 
-      <Panel>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-[#1A1B1E]">Category breakdown</h2>
-          <MonthNav month={month} onChange={setMonth} />
-        </div>
-        <CategoryBars items={categoryBreakdown} />
-      </Panel>
+        <Panel className="lg:col-span-2">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-[#1A1B1E]">Category breakdown</h2>
+            <MonthNav month={month} onChange={setMonth} />
+          </div>
+          <CategoryBars items={categoryBreakdown} />
+        </Panel>
+      </div>
 
       <Panel>
         <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">Transactions</h2>

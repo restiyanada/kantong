@@ -18,7 +18,6 @@ body {
   color: var(--foreground);
 }
 
-/* Visible keyboard focus everywhere, without relying on browser defaults */
 :focus-visible {
   outline: 2px solid #1e7a5f;
   outline-offset: 2px;

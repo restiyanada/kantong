@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Search } from "lucide-react";
 import { formatIDR } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
 import { filterDailyTransactions } from "@/lib/aggregations";
@@ -22,43 +23,58 @@ export function DailyTransactionList({
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border border-[#E2E2DE] p-0.5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex rounded-full bg-[#F0F0EE] p-0.5">
           {TYPE_FILTERS.map((t) => (
             <button
               key={t}
               onClick={() => setType(t)}
-              className={`rounded px-3 py-1 text-xs font-medium capitalize transition-colors ${
-                type === t ? "bg-[#1A1B1E] text-white" : "text-[#6B6D70]"
+              className={`flex-1 rounded-full px-3.5 py-1.5 text-xs font-medium capitalize transition-all duration-150 sm:flex-none ${
+                type === t ? "bg-white text-[#1A1B1E] shadow-sm" : "text-[#6B6D70] hover:text-[#1A1B1E]"
               }`}
             >
               {t}
             </button>
           ))}
         </div>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search notes…"
-          className="ml-auto rounded-md border border-[#E2E2DE] px-3 py-1.5 text-sm text-[#1A1B1E] outline-none focus:border-[#1E7A5F]"
-        />
+        <div className="relative sm:ml-auto sm:w-56">
+          <Search
+            size={14}
+            strokeWidth={2}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#ADAFAF]"
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search notes…"
+            className="w-full rounded-full border border-[#EAEAE6] py-1.5 pl-8 pr-3 text-sm text-[#1A1B1E] outline-none transition-colors duration-150 placeholder:text-[#ADAFAF] focus:border-[#1E7A5F]"
+          />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-6 text-center text-sm text-[#6B6D70]">No transactions match.</p>
+        <div className="flex flex-col items-center justify-center gap-1 py-12 text-center">
+          <p className="text-sm font-medium text-[#6B6D70]">No transactions match</p>
+          <p className="text-xs text-[#ADAFAF]">Try a different filter or search term.</p>
+        </div>
       ) : (
-        <ul className="divide-y divide-[#E2E2DE]">
+        <ul className="divide-y divide-[#F0F0EE]">
           {filtered.map((t) => (
-            <li key={t.id} className="flex items-center justify-between gap-3 py-3">
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
+            >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="w-10 shrink-0 text-xs text-[#6B6D70]">{t.date.slice(5)}</span>
+                <span className="w-10 shrink-0 text-xs tabular-nums text-[#8A8C8E]">
+                  {t.date.slice(5)}
+                </span>
                 {t.pending ? (
                   <span className="shrink-0 rounded-full border border-dashed border-[#B8862B] px-2 py-0.5 text-xs text-[#B8862B]">
                     Pending
                   </span>
                 ) : (
                   <span
-                    className="shrink-0 rounded-full px-2 py-0.5 text-xs text-white"
+                    className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"
                     style={{ backgroundColor: categoryColor(t.category) }}
                   >
                     {t.category}
@@ -67,7 +83,7 @@ export function DailyTransactionList({
                 <span className="truncate text-sm text-[#1A1B1E]">{t.note || "—"}</span>
               </div>
               <span
-                className={`shrink-0 tabular-nums text-sm font-medium ${
+                className={`shrink-0 tabular-nums text-sm font-semibold ${
                   t.type === "income" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
                 }`}
               >
