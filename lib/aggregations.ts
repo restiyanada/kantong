@@ -187,3 +187,22 @@ export function computeNetWorth(
 ): NetWorthBreakdown {
   return { daily, savings, deposito, total: daily + savings + deposito };
 }
+
+export interface GoalBalance {
+  goal: string;
+  balance: number;
+}
+
+/** Net balance (in − out) per savings goal, largest first. */
+export function computeGoalBreakdown(
+  transactions: Pick<SavingsTransactionDecrypted, "goal" | "direction" | "amount">[]
+): GoalBalance[] {
+  const totals = new Map<string, number>();
+  for (const t of transactions) {
+    const signed = t.direction === "in" ? t.amount : -t.amount;
+    totals.set(t.goal, (totals.get(t.goal) ?? 0) + signed);
+  }
+  return [...totals.entries()]
+    .map(([goal, balance]) => ({ goal, balance }))
+    .sort((a, b) => b.balance - a.balance);
+}

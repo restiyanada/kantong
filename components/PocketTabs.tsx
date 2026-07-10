@@ -23,7 +23,7 @@ export function PocketTabs({
     <div
       role="tablist"
       aria-label="Pocket"
-      className="flex w-full gap-1 overflow-x-auto rounded-full border border-[#EAEAE6] bg-white p-1 shadow-[0_1px_2px_rgba(26,27,30,0.04)] sm:w-auto"
+      className="flex w-full min-w-0 gap-1 overflow-x-auto rounded-full border border-[#EAEAE6] bg-white p-1 shadow-[0_1px_2px_rgba(26,27,30,0.04)] sm:w-auto"
     >
       {TABS.map((tab) => {
         const isActive = tab.key === active;

@@ -29,7 +29,9 @@ export function DepositoView({
         {sorted.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-1 py-12 text-center">
             <p className="text-sm font-medium text-[#6B6D70]">No certificates yet</p>
-            <p className="text-xs text-[#ADAFAF]">Send &quot;deposito amount bank term&quot; on Telegram to open one.</p>
+            <p className="text-xs text-[#ADAFAF]">
+              Send &quot;deposito amount bank term&quot; on Telegram to open one.
+            </p>
           </div>
         ) : (
           <ul className="divide-y divide-[#F0F0EE]">
@@ -38,7 +40,7 @@ export function DepositoView({
               return (
                 <li
                   key={c.id}
-                  className="flex items-center justify-between gap-3 py-3.5 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
+                  className="flex flex-col gap-2 py-3.5 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:flex-row sm:items-center sm:justify-between sm:px-2 sm:rounded-lg"
                 >
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[#1A1B1E]">{c.bank}</p>
@@ -46,7 +48,7 @@ export function DepositoView({
                       Opened {c.openedDate} · Matures {c.maturityDate}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
+                  <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
                     <span className="tabular-nums text-sm font-semibold text-[#1A1B1E]">
                       {formatIDR(c.principal)}
                     </span>
