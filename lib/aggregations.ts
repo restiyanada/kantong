@@ -128,7 +128,7 @@ export function filterDailyTransactions(
     .filter((t) => !filter.month || t.date.startsWith(filter.month))
     .filter((t) => !filter.type || filter.type === "all" || t.type === filter.type)
     .filter((t) => !search || t.note.toLowerCase().includes(search))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
 
 // ---- Savings ---------------------------------------------------------------
