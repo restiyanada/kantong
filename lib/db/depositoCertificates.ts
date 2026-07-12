@@ -49,8 +49,8 @@ export async function findActiveCertificatesByBank(
   });
 }
 
-export async function closeCertificate(id: string): Promise<void> {
-  await getDb().collection(COLLECTION).doc(id).update({ status: "closed" });
+export async function closeCertificate(id: string, closedDate: string): Promise<void> {
+  await getDb().collection(COLLECTION).doc(id).update({ status: "closed", closedDate });
 }
 
 /** All certificates regardless of status, decrypted — used by the web app. */

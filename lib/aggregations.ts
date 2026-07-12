@@ -49,12 +49,12 @@ function cutoffForRange(range: TimeRange, todayISO: string): string | null {
   }
 }
 
-/** Restricts a running-balance series to the selected chart time range. */
-export function filterByTimeRange(
-  points: RunningBalancePoint[],
+/** Restricts any date-stamped series to the selected chart time range. */
+export function filterByTimeRange<T extends { date: string }>(
+  points: T[],
   range: TimeRange,
   todayISO: string
-): RunningBalancePoint[] {
+): T[] {
   const cutoff = cutoffForRange(range, todayISO);
   if (!cutoff) return points;
   return points.filter((p) => p.date >= cutoff);
@@ -205,4 +205,66 @@ export function computeGoalBreakdown(
   return [...totals.entries()]
     .map(([goal, balance]) => ({ goal, balance }))
     .sort((a, b) => b.balance - a.balance);
+}
+
+export interface NetWorthPoint {
+  date: string;
+  daily: number;
+  savings: number;
+  deposito: number;
+  total: number;
+}
+
+export function computeNetWorthOverTime(
+  dailyTransactions: Pick<DailyTransactionDecrypted, "date" | "type" | "amount">[],
+  savingsTransactions: Pick<SavingsTransactionDecrypted, "date" | "direction" | "amount">[],
+  certificates: Pick<
+    "openedDate" | "closedDate" | "principal" | "status"
+  >[],
+  todayISO: string
+): NetWorthPoint[] {
+  const eventDates = new Set<string>();
+  for (const t of dailyTransactions) eventDates.add(t.date);
+  for (const t of savingsTransactions) eventDates.add(t.date);
+  for (const c of certificates) {
+    eventDates.add(c.openedDate);
+    if (c.closedDate) eventDates.add(c.closedDate);
+  }
+  eventDates.add(todayISO);
+
+  const dates = [...eventDates].sort();
+
+  const dailyByDate = new Map<string, number>();
+  for (const t of dailyTransactions) {
+    const signed = t.type === "income" ? t.amount : -t.amount;
+    dailyByDate.set(t.date, (dailyByDate.get(t.date) ?? 0) + signed);
+  }
+
+  const savingsByDate = new Map<string, number>();
+  for (const t of savingsTransactions) {
+    const signed = t.direction === "in" ? t.amount : -t.amount;
+    savingsByDate.set(t.date, (savingsByDate.get(t.date) ?? 0) + signed);
+  }
+
+  let runningDaily = 0;
+  let runningSavings = 0;
+
+  return dates.map((date) => {
+    runningDaily += dailyByDate.get(date) ?? 0;
+    runningSavings += savingsByDate.get(date) ?? 0;
+
+    const depositoValue = certificates.reduce((sum, c) => {
+      const isOpenByThen = c.openedDate <= date;
+      const isStillActive = !c.closedDate || c.closedDate >= date;
+      return isOpenByThen && isStillActive ? sum + c.principal : sum;
+    }, 0);
+
+    return {
+      date,
+      daily: runningDaily,
+      savings: runningSavings,
+      deposito: depositoValue,
+      total: runningDaily + runningSavings + depositoValue,
+    };
+  });
 }

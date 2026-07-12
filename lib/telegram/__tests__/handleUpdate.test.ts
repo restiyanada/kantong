@@ -30,6 +30,7 @@ import {
   renewCertificate,
 } from "../../db/depositoCertificates";
 import { sendMessage, answerCallbackQuery, editMessageText } from "../telegramApi";
+import { getTodayISO } from "../dateUtils";
 
 const CHAT_ID = 12345;
 
@@ -107,7 +108,7 @@ describe("handleUpdate — Deposito", () => {
 
     await handleUpdate(message("deposito cairkan bca"));
 
-    expect(closeCertificate).toHaveBeenCalledWith("c1");
+    expect(closeCertificate).toHaveBeenCalledWith("c1", getTodayISO());
   });
 
   it("asks for disambiguation when multiple certificates match", async () => {

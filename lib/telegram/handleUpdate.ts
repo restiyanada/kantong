@@ -155,7 +155,7 @@ async function processLine(
         return { status: "attention", detail: `No active deposito found at ${line.bank}.` };
       }
       if (candidates.length === 1) {
-        await closeCertificate(candidates[0].id);
+        await closeCertificate(candidates[0].id, line.closedDate);
         return {
           status: "logged",
           detail: `Closed deposito at ${line.bank}: ${formatIDR(candidates[0].principal)}`,
@@ -165,7 +165,7 @@ async function processLine(
         sendMessage(
           chatId,
           `Multiple deposito at ${line.bank} — which one to close?`,
-          buildCertificateKeyboard(candidates, "dep_c")
+          buildCertificateKeyboard(candidates, "dep_c", undefined, line.closedDate)
         )
       );
       return { status: "attention" };
@@ -222,14 +222,17 @@ function buildCategoryKeyboard(
 function buildCertificateKeyboard(
   candidates: Array<{ id: string; bank: string; openedDate: string; principal: number }>,
   actionPrefix: "dep_c" | "dep_p",
-  termMonths?: number
+  termMonths?: number,
+  closedDate?: string
 ): InlineKeyboardMarkup {
   return {
     inline_keyboard: candidates.map((c) => [
       {
         text: `${c.bank} • opened ${c.openedDate} • ${formatIDR(c.principal)}`,
         callback_data:
-          actionPrefix === "dep_p" ? `dep_p:${c.id}:${termMonths}` : `dep_c:${c.id}`,
+          actionPrefix === "dep_p"
+            ? `dep_p:${c.id}:${termMonths}`
+            : `dep_c:${c.id}:${closedDate}`,
       },
     ]),
   };
@@ -256,8 +259,8 @@ async function handleCallbackQuery(callbackQuery: TelegramCallbackQuery): Promis
   }
 
   if (action === "dep_c") {
-    const [id] = rest;
-    await closeCertificate(id);
+    const [id, closedDate] = rest;
+    await closeCertificate(id, closedDate);
     await answerCallbackQuery(callbackQuery.id, "Closed");
     await editMessageText(chatId, messageId, "✅ Deposito closed");
     return;

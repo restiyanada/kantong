@@ -44,6 +44,7 @@ export interface DepositoCairkanParsed {
   kind: "deposito_cairkan";
   rawLine: string;
   bank: string;
+  closedDate: string; // YYYY-MM-DD, backdate-aware
 }
 
 export interface DepositoPerpanjangParsed {

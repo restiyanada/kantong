@@ -1,8 +1,23 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import { Wallet, PiggyBank, Landmark } from "lucide-react";
-import { computeNetWorth } from "@/lib/aggregations";
+import {
+  computeNetWorth,
+  computeNetWorthOverTime,
+  filterByTimeRange,
+  type TimeRange,
+} from "@/lib/aggregations";
 import { formatIDR } from "@/lib/format";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
+import { TimeRangeTabs } from "./TimeRangeTabs";
+import { NetWorthChart } from "./NetWorthChart";
+import type {
+  DailyTransactionDecrypted,
+  SavingsTransactionDecrypted,
+  DepositoCertificateDecrypted,
+} from "@/types";
 
 const POCKET_META = [
   { key: "daily", label: "Daily", color: "#3B6FA0", tint: "#3B6FA014", icon: Wallet },
@@ -14,18 +29,44 @@ export function AllView({
   daily,
   savings,
   deposito,
+  todayISO,
 }: {
-  daily: number;
-  savings: number;
-  deposito: number;
+  daily: DailyTransactionDecrypted[];
+  savings: SavingsTransactionDecrypted[];
+  deposito: DepositoCertificateDecrypted[];
+  todayISO: string;
 }) {
-  const breakdown = computeNetWorth(daily, savings, deposito);
+  const [range, setRange] = useState<TimeRange>("3M");
+
+  const dailyBalance = useMemo(
+    () => daily.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
+    [daily]
+  );
+  const savingsBalance = useMemo(
+    () => savings.reduce((sum, t) => sum + (t.direction === "in" ? t.amount : -t.amount), 0),
+    [savings]
+  );
+  const depositoTotal = useMemo(
+    () => deposito.filter((c) => c.status !== "closed").reduce((sum, c) => sum + c.principal, 0),
+    [deposito]
+  );
+
+  const breakdown = computeNetWorth(dailyBalance, savingsBalance, depositoTotal);
   const values: Record<string, number> = {
     daily: breakdown.daily,
     savings: breakdown.savings,
     deposito: breakdown.deposito,
   };
   const max = Math.max(...Object.values(values).map(Math.abs), 1);
+
+  const trendPoints = useMemo(
+    () => computeNetWorthOverTime(daily, savings, deposito, todayISO),
+    [daily, savings, deposito, todayISO]
+  );
+  const chartPoints = useMemo(
+    () => filterByTimeRange(trendPoints, range, todayISO),
+    [trendPoints, range, todayISO]
+  );
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -57,6 +98,14 @@ export function AllView({
           );
         })}
       </div>
+
+      <Panel>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-medium text-[#1A1B1E]">Net worth over time</h2>
+          <TimeRangeTabs value={range} onChange={setRange} />
+        </div>
+        <NetWorthChart points={chartPoints} />
+      </Panel>
     </div>
   );
 }

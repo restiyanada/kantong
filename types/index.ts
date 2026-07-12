@@ -70,6 +70,8 @@ export interface DepositoCertificate {
   maturityDate: string; // YYYY-MM-DD
   termMonths: number;
   status: DepositoStatus;
+  /** Only set once status is "closed" — the actual withdrawal date (PRD 5.4 cairkan). */
+  closedDate?: string; // YYYY-MM-DD
   createdAt: string; // ISO timestamp
 }
 

@@ -140,7 +140,7 @@ function parseDepositoLine(
         message: "Expected `deposito cairkan <bank>`",
       };
     }
-    return { kind: "deposito_cairkan", rawLine, bank: bank.toUpperCase() };
+    return { kind: "deposito_cairkan", rawLine, bank: bank.toUpperCase(), closedDate: date };
   }
 
   if (action === "perpanjang") {

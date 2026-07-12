@@ -12,11 +12,6 @@ import { DailyView } from "./DailyView";
 import { SavingsView } from "./SavingsView";
 import { DepositoView } from "./DepositoView";
 import { AllView } from "./AllView";
-import {
-  computeDailyBalance,
-  computeSavingsBalance,
-  computeDepositoTotal,
-} from "@/lib/aggregations";
 
 export function DashboardShell({
   daily,
@@ -47,11 +42,7 @@ export function DashboardShell({
 
       <div key={tab} className="animate-fade-in-up">
         {tab === "all" && (
-          <AllView
-            daily={computeDailyBalance(daily)}
-            savings={computeSavingsBalance(savings)}
-            deposito={computeDepositoTotal(deposito)}
-          />
+          <AllView daily={daily} savings={savings} deposito={deposito} todayISO={todayISO} />
         )}
         {tab === "daily" && <DailyView transactions={daily} todayISO={todayISO} />}
         {tab === "savings" && <SavingsView transactions={savings} />}
