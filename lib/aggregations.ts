@@ -219,6 +219,7 @@ export function computeNetWorthOverTime(
   dailyTransactions: Pick<DailyTransactionDecrypted, "date" | "type" | "amount">[],
   savingsTransactions: Pick<SavingsTransactionDecrypted, "date" | "direction" | "amount">[],
   certificates: Pick<
+    DepositoCertificateDecrypted,
     "openedDate" | "closedDate" | "principal" | "status"
   >[],
   todayISO: string
