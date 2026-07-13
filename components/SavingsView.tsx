@@ -8,6 +8,7 @@ import { categoryColor } from "@/lib/categoryColors";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 import { DonutChart } from "./DonutChart";
+import { AllocationList } from "./AllocationList";
 
 export function SavingsView({ transactions }: { transactions: SavingsTransactionDecrypted[] }) {
   const balance = useMemo(() => computeSavingsBalance(transactions), [transactions]);
@@ -23,7 +24,7 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
 
       {goalBreakdown.length > 0 && (
         <Panel>
-          <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">By goal</h2>
+          <h2 className="mb-6 text-sm font-medium text-[#1A1B1E]">By goal</h2>
           <DonutChart
             data={goalBreakdown.map((g) => ({
               label: g.goal,
@@ -33,6 +34,15 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
             centerLabel="Savings"
             centerValue={formatIDR(balance)}
           />
+          <div className="mt-6">
+            <AllocationList
+              items={goalBreakdown.map((g) => ({
+                label: g.goal,
+                value: g.balance,
+                color: categoryColor(g.goal),
+              }))}
+            />
+          </div>
         </Panel>
       )}
 

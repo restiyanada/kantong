@@ -14,6 +14,7 @@ import { Panel } from "./Panel";
 import { TimeRangeTabs } from "./TimeRangeTabs";
 import { NetWorthChart, type NetWorthSeriesConfig } from "./NetWorthChart";
 import { DonutChart } from "./DonutChart";
+import { AllocationList } from "./AllocationList";
 import type {
   DailyTransactionDecrypted,
   SavingsTransactionDecrypted,
@@ -21,9 +22,9 @@ import type {
 } from "@/types";
 
 const POCKET_META = [
-  { key: "daily", label: "Daily", color: "#3B6FA0", tint: "#3B6FA014", icon: Wallet },
-  { key: "savings", label: "Savings", color: "#8659B5", tint: "#8659B514", icon: PiggyBank },
-  { key: "deposito", label: "Deposito", color: "#2E8F94", tint: "#2E8F9414", icon: Landmark },
+  { key: "daily", label: "Daily", color: "#3B6FA0", icon: Wallet },
+  { key: "savings", label: "Savings", color: "#8659B5", icon: PiggyBank },
+  { key: "deposito", label: "Deposito", color: "#2E8F94", icon: Landmark },
 ] as const;
 
 const SAVINGS_DEPOSITO_SERIES: NetWorthSeriesConfig[] = [
@@ -77,36 +78,23 @@ export function AllView({
     <div className="space-y-4 sm:space-y-6">
       <BalanceCard label="Total net worth" balance={breakdown.total} />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        {POCKET_META.map((p) => {
-          const Icon = p.icon;
-          const value = values[p.key];
-          return (
-            <Panel key={p.key} className="flex items-center gap-3">
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
-                style={{ backgroundColor: p.tint }}
-              >
-                <Icon size={16} color={p.color} strokeWidth={2.25} />
-              </div>
-              <div>
-                <p className="text-xs font-medium text-[#8A8C8E]">{p.label}</p>
-                <p className="text-lg font-semibold tabular-nums text-[#1A1B1E]">
-                  {formatIDR(value)}
-                </p>
-              </div>
-            </Panel>
-          );
-        })}
-      </div>
-
       <Panel>
-        <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">Proportion of net worth</h2>
+        <h2 className="mb-6 text-sm font-medium text-[#1A1B1E]">Proportion of net worth</h2>
         <DonutChart
           data={POCKET_META.map((p) => ({ label: p.label, value: values[p.key], color: p.color }))}
           centerLabel="Total"
           centerValue={formatIDR(breakdown.total)}
         />
+        <div className="mt-6">
+          <AllocationList
+            items={POCKET_META.map((p) => ({
+              label: p.label,
+              value: values[p.key],
+              color: p.color,
+              icon: p.icon,
+            }))}
+          />
+        </div>
       </Panel>
 
       <Panel>
