@@ -7,6 +7,7 @@ import { formatIDR } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
+import { DonutChart } from "./DonutChart";
 
 export function SavingsView({ transactions }: { transactions: SavingsTransactionDecrypted[] }) {
   const balance = useMemo(() => computeSavingsBalance(transactions), [transactions]);
@@ -15,7 +16,6 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
     () => [...transactions].sort((a, b) => b.date.localeCompare(a.date)),
     [transactions]
   );
-  const maxGoalBalance = Math.max(...goalBreakdown.map((g) => Math.abs(g.balance)), 1);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -24,25 +24,15 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
       {goalBreakdown.length > 0 && (
         <Panel>
           <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">By goal</h2>
-          <div className="space-y-4">
-            {goalBreakdown.map((g) => (
-              <div key={g.goal}>
-                <div className="mb-1.5 flex items-baseline justify-between text-sm">
-                  <span className="font-medium text-[#1A1B1E]">{g.goal}</span>
-                  <span className="tabular-nums text-[#6B6D70]">{formatIDR(g.balance)}</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[#F0F0EE]">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-500 ease-out"
-                    style={{
-                      width: `${(Math.abs(g.balance) / maxGoalBalance) * 100}%`,
-                      backgroundColor: categoryColor(g.goal),
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          <DonutChart
+            data={goalBreakdown.map((g) => ({
+              label: g.goal,
+              value: g.balance,
+              color: categoryColor(g.goal),
+            }))}
+            centerLabel="Savings"
+            centerValue={formatIDR(balance)}
+          />
         </Panel>
       )}
 

@@ -13,13 +13,25 @@ import {
 import { formatIDR } from "@/lib/format";
 import type { NetWorthPoint } from "@/lib/aggregations";
 
-const SERIES = [
+export interface NetWorthSeriesConfig {
+  key: "daily" | "savings" | "deposito";
+  label: string;
+  color: string;
+}
+
+const DEFAULT_SERIES: NetWorthSeriesConfig[] = [
   { key: "daily", label: "Daily", color: "#3B6FA0" },
   { key: "savings", label: "Savings", color: "#8659B5" },
   { key: "deposito", label: "Deposito", color: "#2E8F94" },
-] as const;
+];
 
-export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
+export function NetWorthChart({
+  points,
+  series = DEFAULT_SERIES,
+}: {
+  points: NetWorthPoint[];
+  series?: NetWorthSeriesConfig[];
+}) {
   if (points.length === 0) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-1 text-center">
@@ -34,7 +46,7 @@ export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
-            {SERIES.map((s) => (
+            {series.map((s) => (
               <linearGradient key={s.key} id={`fill-${s.key}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={s.color} stopOpacity={0.5} />
                 <stop offset="100%" stopColor={s.color} stopOpacity={0.15} />
@@ -58,7 +70,7 @@ export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
           <Tooltip
             formatter={(value, name) => [
               formatIDR(Number(value)),
-              SERIES.find((s) => s.key === name)?.label ?? name,
+              series.find((s) => s.key === name)?.label ?? name,
             ]}
             contentStyle={{
               borderRadius: 10,
@@ -68,10 +80,10 @@ export function NetWorthChart({ points }: { points: NetWorthPoint[] }) {
             }}
           />
           <Legend
-            formatter={(value) => SERIES.find((s) => s.key === value)?.label ?? value}
+            formatter={(value) => series.find((s) => s.key === value)?.label ?? value}
             wrapperStyle={{ fontSize: 12 }}
           />
-          {SERIES.map((s) => (
+          {series.map((s) => (
             <Area
               key={s.key}
               type="monotone"

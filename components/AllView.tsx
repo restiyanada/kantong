@@ -12,7 +12,8 @@ import { formatIDR } from "@/lib/format";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 import { TimeRangeTabs } from "./TimeRangeTabs";
-import { NetWorthChart } from "./NetWorthChart";
+import { NetWorthChart, type NetWorthSeriesConfig } from "./NetWorthChart";
+import { DonutChart } from "./DonutChart";
 import type {
   DailyTransactionDecrypted,
   SavingsTransactionDecrypted,
@@ -24,6 +25,11 @@ const POCKET_META = [
   { key: "savings", label: "Savings", color: "#8659B5", tint: "#8659B514", icon: PiggyBank },
   { key: "deposito", label: "Deposito", color: "#2E8F94", tint: "#2E8F9414", icon: Landmark },
 ] as const;
+
+const SAVINGS_DEPOSITO_SERIES: NetWorthSeriesConfig[] = [
+  { key: "savings", label: "Savings", color: "#8659B5" },
+  { key: "deposito", label: "Deposito", color: "#2E8F94" },
+];
 
 export function AllView({
   daily,
@@ -57,7 +63,6 @@ export function AllView({
     savings: breakdown.savings,
     deposito: breakdown.deposito,
   };
-  const max = Math.max(...Object.values(values).map(Math.abs), 1);
 
   const trendPoints = useMemo(
     () => computeNetWorthOverTime(daily, savings, deposito, todayISO),
@@ -77,22 +82,18 @@ export function AllView({
           const Icon = p.icon;
           const value = values[p.key];
           return (
-            <Panel key={p.key}>
+            <Panel key={p.key} className="flex items-center gap-3">
               <div
-                className="flex h-9 w-9 items-center justify-center rounded-full"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: p.tint }}
               >
                 <Icon size={16} color={p.color} strokeWidth={2.25} />
               </div>
-              <p className="mt-3 text-xs font-medium text-[#8A8C8E]">{p.label}</p>
-              <p className="mt-0.5 text-lg font-semibold tabular-nums text-[#1A1B1E]">
-                {formatIDR(value)}
-              </p>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#F0F0EE]">
-                <div
-                  className="h-full rounded-full transition-[width] duration-500 ease-out"
-                  style={{ width: `${(Math.abs(value) / max) * 100}%`, backgroundColor: p.color }}
-                />
+              <div>
+                <p className="text-xs font-medium text-[#8A8C8E]">{p.label}</p>
+                <p className="text-lg font-semibold tabular-nums text-[#1A1B1E]">
+                  {formatIDR(value)}
+                </p>
               </div>
             </Panel>
           );
@@ -100,11 +101,20 @@ export function AllView({
       </div>
 
       <Panel>
+        <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">Proportion of net worth</h2>
+        <DonutChart
+          data={POCKET_META.map((p) => ({ label: p.label, value: values[p.key], color: p.color }))}
+          centerLabel="Total"
+          centerValue={formatIDR(breakdown.total)}
+        />
+      </Panel>
+
+      <Panel>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-[#1A1B1E]">Net worth over time</h2>
+          <h2 className="text-sm font-medium text-[#1A1B1E]">Savings &amp; Deposito over time</h2>
           <TimeRangeTabs value={range} onChange={setRange} />
         </div>
-        <NetWorthChart points={chartPoints} />
+        <NetWorthChart points={chartPoints} series={SAVINGS_DEPOSITO_SERIES} />
       </Panel>
     </div>
   );
