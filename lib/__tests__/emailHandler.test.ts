@@ -40,13 +40,13 @@ describe("handleIncomingEmail", () => {
       messageId: "gmail-msg-1",
     });
 
-    expect(outcome).toEqual({ logged: true, category: "Other", amount: 5200 });
+    expect(outcome).toEqual({ logged: true, category: "Food", amount: 5200 });
     expect(createDailyTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "expense",
         amount: 5200,
-        category: "Other",
-        pending: true,
+        category: "Food",
+        pending: false,
         sourceMessageId: "gmail-msg-1",
       })
     );

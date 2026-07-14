@@ -32,8 +32,8 @@ describe("parseBCA", () => {
     expect(result.amount).toBe(5200);
     expect(result.date).toBe("2026-07-13");
     expect(result.note).toBe("FMI PLAZA OLEOS");
-    expect(result.category).toBe("Other");
-    expect(result.pending).toBe(true);
+    expect(result.category).toBe("Food");
+    expect(result.pending).toBe(false);
     expect(result.referenceId).toBe(
       "9527120260713171530273QRS0849819881"
     );
