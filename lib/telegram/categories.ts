@@ -21,6 +21,8 @@ export const DAILY_EXPENSE_CATEGORY_KEYWORDS: Record<string, string> = {
   belanja: "Shopping",
   health: "Health",
   kesehatan: "Health",
+  entertainment: "Entertainment",
+  hiburan: "Entertainment",
   other: "Other",
   lainnya: "Other",
 };

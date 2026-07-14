@@ -199,7 +199,7 @@ async function processLine(
   }
 }
 
-function buildCategoryKeyboard(
+export function buildCategoryKeyboard(
   dailyTransactionId: string,
   type: "income" | "expense"
 ): InlineKeyboardMarkup {

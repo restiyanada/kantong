@@ -1,0 +1,1574 @@
+diff --git a/.env.example b/.env.example
+index 9d8ac99..5aac68a 100644
+--- a/.env.example
++++ b/.env.example
+@@ -18,3 +18,18 @@ TELEGRAM_WEBHOOK_SECRET=
+ # Web app light access gate (PRD section 3/8) — not a full auth system,
+ # just a shared passphrase. Pick any string.
+ WEB_ACCESS_PASSWORD=
++
++# Shared secret between Apps Script and /api/email (PRD_Auto_Log_Bank_Emails).
++# Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
++EMAIL_API_SECRET=
++
++# Your personal Telegram chat ID (a number) — the digest is a proactive
++# push, not a reply, so there's no incoming message to read a chat ID from.
++# Message your bot anything, then check the "chat":{"id":...} field via
++# https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getUpdates
++TELEGRAM_CHAT_ID=
++
++# Set by you; Vercel Cron automatically sends this as a Bearer token when
++# it invokes /api/cron/digest, so the route can verify the request is
++# really from Vercel's scheduler.
++CRON_SECRET=
+diff --git a/app/api/cron/digest/route.ts b/app/api/cron/digest/route.ts
+new file mode 100644
+index 0000000..3e28ee1
+--- /dev/null
++++ b/app/api/cron/digest/route.ts
+@@ -0,0 +1,19 @@
++import { NextRequest, NextResponse } from "next/server";
++import { sendDailyDigest } from "@/lib/dailyDigest";
++
++export async function GET(request: NextRequest) {
++  // Vercel Cron automatically sends this header when CRON_SECRET is set:
++  // https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs
++  const auth = request.headers.get("authorization");
++  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
++    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
++  }
++
++  try {
++    const result = await sendDailyDigest();
++    return NextResponse.json(result);
++  } catch (error) {
++    console.error("Error sending daily digest:", error);
++    return NextResponse.json({ error: "Internal error" }, { status: 500 });
++  }
++}
+diff --git a/app/api/email/route.ts b/app/api/email/route.ts
+new file mode 100644
+index 0000000..77a4593
+--- /dev/null
++++ b/app/api/email/route.ts
+@@ -0,0 +1,27 @@
++import { NextRequest, NextResponse } from "next/server";
++import { handleIncomingEmail, type IncomingEmail } from "@/lib/emailHandler";
++
++export async function POST(request: NextRequest) {
++  const auth = request.headers.get("authorization");
++  if (auth !== `Bearer ${process.env.EMAIL_API_SECRET}`) {
++    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
++  }
++
++  const body = await request.json();
++  const { from, subject, body: emailBody, messageId } = body as Partial<IncomingEmail>;
++
++  if (!from || !subject || !emailBody || !messageId) {
++    return NextResponse.json(
++      { error: "Missing required fields: from, subject, body, messageId" },
++      { status: 400 }
++    );
++  }
++
++  try {
++    const outcome = await handleIncomingEmail({ from, subject, body: emailBody, messageId });
++    return NextResponse.json(outcome);
++  } catch (error) {
++    console.error("Error handling incoming email:", error);
++    return NextResponse.json({ error: "Internal error" }, { status: 500 });
++  }
++}
+diff --git a/apps-script/kantong-email-watcher.gs b/apps-script/kantong-email-watcher.gs
+new file mode 100644
+index 0000000..bed93a2
+--- /dev/null
++++ b/apps-script/kantong-email-watcher.gs
+@@ -0,0 +1,136 @@
++/**
++ * Kantong — Auto-Log Bank Emails: Gmail watcher.
++ *
++ * Deliberately "dumb" — does NOT parse amounts/merchants/categories itself.
++ * It just finds unprocessed emails from known senders and forwards the raw
++ * from/subject/body/messageId to /api/email, which does all real parsing
++ * (see PRD_Auto_Log_Bank_Emails.md and lib/emailParsers/ in the main repo).
++ * Keeping parsing out of Apps Script means it's tested with real vitest
++ * fixtures instead of debugged inside the Apps Script editor.
++ *
++ * SETUP (one-time, all in the browser, no local terminal needed):
++ *   1. Go to script.google.com > New project, paste this whole file in.
++ *   2. Project Settings (gear icon) > Script Properties > add two:
++ *        KANTONG_API_URL    = https://<your-vercel-app>.vercel.app/api/email
++ *        KANTONG_API_SECRET = <same value as EMAIL_API_SECRET in Vercel>
++ *   3. Select `createTimeTrigger` from the function dropdown at the top,
++ *      click Run. Google will prompt for permission the first time
++ *      (Gmail read/modify + external requests) — approve it.
++ *      This both runs the watcher once immediately AND sets up the
++ *      recurring 5-minute trigger, so no separate "add trigger" step.
++ *   4. Check Executions (clock icon, left sidebar) to confirm it ran
++ *      without errors, then check Firestore / the web app for the result.
++ *
++ * No manual Gmail filter or label needs to be created — the script creates
++ * and manages its own "kantong-processed" label automatically.
++ */
++
++const PROCESSED_LABEL_NAME = "kantong-processed";
++const KNOWN_SENDERS = [
++  "bca@bca.co.id",
++  "dbank.app@danamon.co.id",
++  "dbsindonesia@1bank.dbs.com",
++  "no-reply@grab.com",
++];
++const MAX_THREADS_PER_RUN = 50;
++
++/** Entry point — run manually once, then on the recurring trigger. */
++function processKantongEmails() {
++  const props = PropertiesService.getScriptProperties();
++  const apiUrl = props.getProperty("KANTONG_API_URL");
++  const apiSecret = props.getProperty("KANTONG_API_SECRET");
++
++  if (!apiUrl || !apiSecret) {
++    Logger.log(
++      "Missing KANTONG_API_URL or KANTONG_API_SECRET script property — set both under Project Settings > Script Properties."
++    );
++    return;
++  }
++
++  const processedLabel = getOrCreateProcessedLabel();
++  const senderQuery = KNOWN_SENDERS.map((s) => `from:${s}`).join(" OR ");
++  const query = `(${senderQuery}) -label:${PROCESSED_LABEL_NAME}`;
++
++  const threads = GmailApp.search(query, 0, MAX_THREADS_PER_RUN);
++  Logger.log(`Found ${threads.length} unprocessed thread(s).`);
++
++  for (const thread of threads) {
++    const allOk = processThread(thread, apiUrl, apiSecret);
++    // Only mark as processed if every message in the thread went through
++    // cleanly — a 5xx/network error should be retried on the next run,
++    // not silently skipped forever.
++    if (allOk) {
++      thread.addLabel(processedLabel);
++    }
++  }
++}
++
++/** Forwards every message in a thread; returns false if any should be retried. */
++function processThread(thread, apiUrl, apiSecret) {
++  let allOk = true;
++
++  for (const message of thread.getMessages()) {
++    const payload = {
++      from: message.getFrom(),
++      subject: message.getSubject(),
++      body: message.getPlainBody(),
++      messageId: message.getId(),
++    };
++
++    try {
++      const response = UrlFetchApp.fetch(apiUrl, {
++        method: "post",
++        contentType: "application/json",
++        headers: { Authorization: `Bearer ${apiSecret}` },
++        payload: JSON.stringify(payload),
++        muteHttpExceptions: true,
++      });
++
++      const status = response.getResponseCode();
++      const responseText = response.getContentText();
++
++      if (status >= 500) {
++        // Transient/server-side failure — leave unlabeled so it's retried.
++        allOk = false;
++        Logger.log(`[retry] ${payload.messageId}: HTTP ${status} — ${responseText}`);
++      } else {
++        // 200 (logged, or a deliberate skip/duplicate) or 400/401 (a
++        // payload/auth problem that won't fix itself on retry either) —
++        // both are "done", so this message won't be looked at again.
++        Logger.log(`[done] ${payload.messageId}: HTTP ${status} — ${responseText}`);
++      }
++    } catch (err) {
++      allOk = false;
++      Logger.log(`[retry] ${payload.messageId}: request failed — ${err}`);
++    }
++  }
++
++  return allOk;
++}
++
++function getOrCreateProcessedLabel() {
++  return (
++    GmailApp.getUserLabelByName(PROCESSED_LABEL_NAME) ||
++    GmailApp.createLabel(PROCESSED_LABEL_NAME)
++  );
++}
++
++/**
++ * Run this once from the Apps Script editor to set up the recurring
++ * schedule. Safe to re-run — it removes any existing trigger for
++ * `processKantongEmails` first, so it never creates duplicates.
++ */
++function createTimeTrigger() {
++  for (const trigger of ScriptApp.getProjectTriggers()) {
++    if (trigger.getHandlerFunction() === "processKantongEmails") {
++      ScriptApp.deleteTrigger(trigger);
++    }
++  }
++
++  ScriptApp.newTrigger("processKantongEmails").timeBased().everyMinutes(5).create();
++
++  Logger.log("Trigger created — processKantongEmails will now run every 5 minutes.");
++
++  // Also run once immediately so setup can be verified right away.
++  processKantongEmails();
++}
+diff --git a/lib/__tests__/dailyDigest.test.ts b/lib/__tests__/dailyDigest.test.ts
+new file mode 100644
+index 0000000..013fc7f
+--- /dev/null
++++ b/lib/__tests__/dailyDigest.test.ts
+@@ -0,0 +1,92 @@
++import { describe, it, expect, vi, beforeEach } from "vitest";
++
++vi.mock("../db/dailyTransactions", () => ({
++  listPendingDailyTransactions: vi.fn(),
++}));
++vi.mock("../telegram/telegramApi", () => ({
++  sendMessage: vi.fn(async () => undefined),
++}));
++vi.mock("../telegram/handleUpdate", () => ({
++  buildCategoryKeyboard: vi.fn(() => ({ inline_keyboard: [] })),
++}));
++
++import { sendDailyDigest } from "../dailyDigest";
++import { listPendingDailyTransactions } from "../db/dailyTransactions";
++import { sendMessage } from "../telegram/telegramApi";
++
++const CHAT_ID = 999888777;
++
++function pendingTx(id: string, amount: number, note: string) {
++  return {
++    id,
++    type: "expense" as const,
++    amount,
++    category: "Other",
++    pending: true,
++    note,
++    date: "2026-07-14",
++    createdAt: "2026-07-14T00:00:00.000Z",
++  };
++}
++
++beforeEach(() => {
++  vi.clearAllMocks();
++  process.env.TELEGRAM_CHAT_ID = String(CHAT_ID);
++});
++
++describe("sendDailyDigest", () => {
++  it("sends nothing on a silent day (no pending transactions)", async () => {
++    vi.mocked(listPendingDailyTransactions).mockResolvedValue([]);
++
++    const result = await sendDailyDigest();
++
++    expect(result).toEqual({ sent: 0, overflow: 0, skipped: true });
++    expect(sendMessage).not.toHaveBeenCalled();
++  });
++
++  it("sends an intro plus one message per pending transaction", async () => {
++    vi.mocked(listPendingDailyTransactions).mockResolvedValue([
++      pendingTx("a", 50000, "BUDI SANTOSO"),
++      pendingTx("b", 1200000, "AGUS WIRYONO"),
++    ]);
++
++    const result = await sendDailyDigest();
++
++    expect(result).toEqual({ sent: 2, overflow: 0, skipped: false });
++    // intro + 2 item messages, no overflow message
++    expect(sendMessage).toHaveBeenCalledTimes(3);
++    expect(sendMessage).toHaveBeenNthCalledWith(
++      1,
++      CHAT_ID,
++      expect.stringContaining("2 transactions need attention")
++    );
++    expect(sendMessage).toHaveBeenNthCalledWith(
++      2,
++      CHAT_ID,
++      expect.stringContaining("BUDI SANTOSO"),
++      expect.anything()
++    );
++  });
++
++  it("caps at 10 items and reports the overflow count", async () => {
++    const items = Array.from({ length: 13 }, (_, i) =>
++      pendingTx(`tx-${i}`, 1000 * (i + 1), `Merchant ${i}`)
++    );
++    vi.mocked(listPendingDailyTransactions).mockResolvedValue(items);
++
++    const result = await sendDailyDigest();
++
++    expect(result).toEqual({ sent: 10, overflow: 3, skipped: false });
++    // intro + 10 item messages + 1 overflow notice
++    expect(sendMessage).toHaveBeenCalledTimes(12);
++    expect(sendMessage).toHaveBeenLastCalledWith(
++      CHAT_ID,
++      expect.stringContaining("3 more on web app")
++    );
++  });
++
++  it("throws if TELEGRAM_CHAT_ID isn't configured", async () => {
++    delete process.env.TELEGRAM_CHAT_ID;
++    await expect(sendDailyDigest()).rejects.toThrow("TELEGRAM_CHAT_ID");
++  });
++});
+diff --git a/lib/__tests__/emailHandler.test.ts b/lib/__tests__/emailHandler.test.ts
+new file mode 100644
+index 0000000..ec48cd1
+--- /dev/null
++++ b/lib/__tests__/emailHandler.test.ts
+@@ -0,0 +1,95 @@
++import { describe, it, expect, vi, beforeEach } from "vitest";
++
++vi.mock("../db/dailyTransactions", () => ({
++  createDailyTransaction: vi.fn(async () => "daily-doc-1"),
++  dailyTransactionExistsForMessage: vi.fn(async () => false),
++}));
++
++import { handleIncomingEmail } from "../emailHandler";
++import {
++  createDailyTransaction,
++  dailyTransactionExistsForMessage,
++} from "../db/dailyTransactions";
++
++const BCA_BODY = `
++Status : Berhasil
++Tanggal Transaksi : 13 Jul 2026 17:15:33
++Jenis Transaksi : Pembayaran QRIS
++Pembayaran Ke : FMI PLAZA OLEOS
++Total Bayar : IDR 5,200.00
++Nomor Referensi : 9527120260713171530273QRS0849819881
++`;
++
++const DANAMON_TRANSFER_BODY = `
++Status Berhasil
++No. Referensi 2026070719581198780
++Nama Penerima Restiyana Dwi Astuti
++Nominal Transaksi Rp50.000,00
++`;
++
++beforeEach(() => {
++  vi.clearAllMocks();
++});
++
++describe("handleIncomingEmail", () => {
++  it("logs a real transaction and stores the Gmail messageId for dedupe", async () => {
++    const outcome = await handleIncomingEmail({
++      from: "BCA <bca@bca.co.id>",
++      subject: "Internet Transaction Journal",
++      body: BCA_BODY,
++      messageId: "gmail-msg-1",
++    });
++
++    expect(outcome).toEqual({ logged: true, category: "Other", amount: 5200 });
++    expect(createDailyTransaction).toHaveBeenCalledWith(
++      expect.objectContaining({
++        type: "expense",
++        amount: 5200,
++        category: "Other",
++        pending: true,
++        sourceMessageId: "gmail-msg-1",
++      })
++    );
++  });
++
++  it("skips a duplicate message without writing anything", async () => {
++    vi.mocked(dailyTransactionExistsForMessage).mockResolvedValueOnce(true);
++
++    const outcome = await handleIncomingEmail({
++      from: "BCA <bca@bca.co.id>",
++      subject: "Internet Transaction Journal",
++      body: BCA_BODY,
++      messageId: "gmail-msg-1",
++    });
++
++    expect(outcome).toEqual({ logged: false, reason: "duplicate (already logged)" });
++    expect(createDailyTransaction).not.toHaveBeenCalled();
++  });
++
++  it("skips a Danamon self-transfer without writing anything", async () => {
++    const outcome = await handleIncomingEmail({
++      from: "D-Bank PRO by Danamon <dbank.app@danamon.co.id>",
++      subject: "Transfer ke Rekening Lain Berhasil (Tidak Perlu Dibalas)",
++      body: DANAMON_TRANSFER_BODY,
++      messageId: "gmail-msg-2",
++    });
++
++    expect(outcome.logged).toBe(false);
++    expect(createDailyTransaction).not.toHaveBeenCalled();
++  });
++
++  it("does not write anything for an unrecognized sender", async () => {
++    const outcome = await handleIncomingEmail({
++      from: "someone@example.com",
++      subject: "hi",
++      body: "not a bank email",
++      messageId: "gmail-msg-3",
++    });
++
++    expect(outcome).toEqual({
++      logged: false,
++      reason: "unrecognized sender or unparseable email",
++    });
++    expect(createDailyTransaction).not.toHaveBeenCalled();
++  });
++});
+diff --git a/lib/categoryColors.ts b/lib/categoryColors.ts
+index 27fa049..a006469 100644
+--- a/lib/categoryColors.ts
++++ b/lib/categoryColors.ts
+@@ -8,6 +8,7 @@ const CATEGORY_COLORS: Record<string, string> = {
+   Bills: "#B8862B",
+   Shopping: "#2E8F94",
+   Health: "#C15FA0",
++  Entertainment: "#C1622E",
+   Other: "#6B6D70",
+   Salary: "#1E7A5F",
+   "Other Income": "#2E8F94",
+diff --git a/lib/dailyDigest.ts b/lib/dailyDigest.ts
+new file mode 100644
+index 0000000..8d01cf2
+--- /dev/null
++++ b/lib/dailyDigest.ts
+@@ -0,0 +1,57 @@
++import { listPendingDailyTransactions } from "./db/dailyTransactions";
++import { sendMessage } from "./telegram/telegramApi";
++import { buildCategoryKeyboard } from "./telegram/handleUpdate";
++import { formatIDR } from "./format";
++
++const MAX_SHOWN = 10; // PRD_Auto_Log_Bank_Emails.md section 9.2
++
++export interface DigestResult {
++  sent: number;
++  overflow: number;
++  /** True on a "silent day" — no pending transactions, nothing sent. */
++  skipped: boolean;
++}
++
++/**
++ * Sends the daily digest: an intro line, then one message per pending
++ * transaction with tappable category buttons underneath (reusing the same
++ * `dc:<id>:<category>` keyboard/callback the bot already uses for
++ * ambiguous Telegram-typed entries — no new button-handling code needed).
++ *
++ * Queries ALL pending transactions regardless of date (not just today's),
++ * per the "don't let anything silently fall through the cracks" decision —
++ * a transaction keeps reappearing every night until it's actually resolved.
++ */
++export async function sendDailyDigest(): Promise<DigestResult> {
++  const chatId = Number(process.env.TELEGRAM_CHAT_ID);
++  if (!chatId) {
++    throw new Error("TELEGRAM_CHAT_ID environment variable is not set");
++  }
++
++  const pending = await listPendingDailyTransactions();
++  if (pending.length === 0) {
++    return { sent: 0, overflow: 0, skipped: true }; // silent day
++  }
++
++  const toShow = pending.slice(0, MAX_SHOWN);
++  const overflow = pending.length - toShow.length;
++
++  await sendMessage(
++    chatId,
++    `📬 ${pending.length} transaction${pending.length === 1 ? "" : "s"} need attention`
++  );
++
++  for (const tx of toShow) {
++    await sendMessage(
++      chatId,
++      `${formatIDR(tx.amount)}${tx.note ? ` — ${tx.note}` : ""}`,
++      buildCategoryKeyboard(tx.id, tx.type)
++    );
++  }
++
++  if (overflow > 0) {
++    await sendMessage(chatId, `…and ${overflow} more on web app`);
++  }
++
++  return { sent: toShow.length, overflow, skipped: false };
++}
+diff --git a/lib/db/dailyTransactions.ts b/lib/db/dailyTransactions.ts
+index 5a662de..689e74a 100644
+--- a/lib/db/dailyTransactions.ts
++++ b/lib/db/dailyTransactions.ts
+@@ -11,6 +11,8 @@ export async function createDailyTransaction(data: {
+   pending: boolean;
+   note: string;
+   date: string;
++  /** Set only by the email pipeline — see DailyTransaction.sourceMessageId. */
++  sourceMessageId?: string;
+ }): Promise<string> {
+   const db = getDb();
+   const doc = await db.collection(COLLECTION).add({
+@@ -21,10 +23,26 @@ export async function createDailyTransaction(data: {
+     note: data.note,
+     date: data.date,
+     createdAt: new Date().toISOString(),
++    ...(data.sourceMessageId ? { sourceMessageId: data.sourceMessageId } : {}),
+   });
+   return doc.id;
+ }
+ 
++/**
++ * Checks whether a transaction from this Gmail message was already logged —
++ * used by /api/email to avoid duplicate entries on retried/re-sent emails.
++ */
++export async function dailyTransactionExistsForMessage(
++  sourceMessageId: string
++): Promise<boolean> {
++  const snap = await getDb()
++    .collection(COLLECTION)
++    .where("sourceMessageId", "==", sourceMessageId)
++    .limit(1)
++    .get();
++  return !snap.empty;
++}
++
+ /** Sets the category on a pending transaction once a button is tapped (PRD 5.6). */
+ export async function resolveDailyCategory(
+   id: string,
+@@ -54,3 +72,21 @@ export async function listDailyTransactions(): Promise<DailyTransactionDecrypted
+     return { id: doc.id, ...data, amount: decryptAmount(data.amount) };
+   });
+ }
++
++/**
++ * All pending transactions regardless of date — used by the daily digest.
++ * Deliberately not scoped to "today" so a transaction never silently stops
++ * appearing just because a day passed without it being resolved.
++ */
++export async function listPendingDailyTransactions(): Promise<
++  DailyTransactionDecrypted[]
++> {
++  const snap = await getDb()
++    .collection(COLLECTION)
++    .where("pending", "==", true)
++    .get();
++  return snap.docs.map((doc) => {
++    const data = doc.data() as Omit<DailyTransaction, "id">;
++    return { id: doc.id, ...data, amount: decryptAmount(data.amount) };
++  });
++}
+diff --git a/lib/emailHandler.ts b/lib/emailHandler.ts
+new file mode 100644
+index 0000000..c1b27e8
+--- /dev/null
++++ b/lib/emailHandler.ts
+@@ -0,0 +1,53 @@
++import { createDailyTransaction, dailyTransactionExistsForMessage } from "./db/dailyTransactions";
++import { parseSourceEmail, isSkip } from "./emailParsers";
++
++export interface IncomingEmail {
++  from: string;
++  subject: string;
++  body: string;
++  /** Gmail's unique message ID — the dedupe key (see emailParsers/types.ts). */
++  messageId: string;
++}
++
++export type EmailOutcome =
++  | { logged: true; category: string; amount: number }
++  | { logged: false; reason: string };
++
++/**
++ * Handles one incoming bank/e-wallet email: dedupe, parse, and (if
++ * everything checks out) write a new expense to the Daily pocket.
++ *
++ * Per PRD_Auto_Log_Bank_Emails.md section 7.3 — a parse failure (return
++ * `null`) means we don't create a record at all, just report why. A `skip`
++ * result (e.g. a Danamon self-transfer) is a deliberate no-op, not a
++ * failure.
++ */
++export async function handleIncomingEmail(
++  email: IncomingEmail
++): Promise<EmailOutcome> {
++  const alreadyLogged = await dailyTransactionExistsForMessage(email.messageId);
++  if (alreadyLogged) {
++    return { logged: false, reason: "duplicate (already logged)" };
++  }
++
++  const result = parseSourceEmail(email.from, email.subject, email.body);
++
++  if (result === null) {
++    return { logged: false, reason: "unrecognized sender or unparseable email" };
++  }
++  if (isSkip(result)) {
++    return { logged: false, reason: result.reason };
++  }
++
++  await createDailyTransaction({
++    type: "expense", // income auto-logging is out of scope (NG1)
++    amount: result.amount,
++    category: result.category,
++    pending: result.pending,
++    note: result.note,
++    date: result.date,
++    sourceMessageId: email.messageId,
++  });
++
++  return { logged: true, category: result.category, amount: result.amount };
++}
+diff --git a/lib/emailParsers/__tests__/bca.test.ts b/lib/emailParsers/__tests__/bca.test.ts
+new file mode 100644
+index 0000000..d7a74d4
+--- /dev/null
++++ b/lib/emailParsers/__tests__/bca.test.ts
+@@ -0,0 +1,52 @@
++import { describe, it, expect } from "vitest";
++import { parseBCA } from "../bca";
++import { isSkip } from "../types";
++
++const QRIS_BODY = `
++Hai RESTIYANA DWI ASTUTI,
++Anda baru saja melakukan transaksi dengan menggunakan fasilitas myBCA.
++Berikut ini adalah detail transaksi Anda :
++
++Status : Berhasil
++Tanggal Transaksi : 13 Jul 2026 17:15:33
++Jenis Transaksi : Pembayaran QRIS
++Pembayaran Ke : FMI PLAZA OLEOS
++Lokasi Merchant : JAKARTA SELAT, 12550, ID
++Pengakuisisi : BCA
++Merchant PAN : 9360001430022454661
++Terminal ID : A1BV9566
++Sumber Dana : TAHAPAN - 2831****68
++Customer PAN : 9360001410105802911
++Total Bayar : IDR 5,200.00
++RRN : 261223486
++Nomor Referensi : 9527120260713171530273QRS0849819881
++Mohon simpan email ini sebagai referensi transaksi Anda.
++`;
++
++describe("parseBCA", () => {
++  it("parses a QRIS payment with unmapped merchant as pending Other", () => {
++    const result = parseBCA(QRIS_BODY);
++    expect(isSkip(result)).toBe(false);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++
++    expect(result.amount).toBe(5200);
++    expect(result.date).toBe("2026-07-13");
++    expect(result.note).toBe("FMI PLAZA OLEOS");
++    expect(result.category).toBe("Other");
++    expect(result.pending).toBe(true);
++    expect(result.referenceId).toBe(
++      "9527120260713171530273QRS0849819881"
++    );
++  });
++
++  it("returns null when the amount can't be found", () => {
++    const result = parseBCA("Status : Berhasil\nJenis Transaksi : Pembayaran QRIS");
++    expect(result).toBeNull();
++  });
++
++  it("skips a failed transaction", () => {
++    const failed = QRIS_BODY.replace("Berhasil", "Gagal");
++    const result = parseBCA(failed);
++    expect(isSkip(result)).toBe(true);
++  });
++});
+diff --git a/lib/emailParsers/__tests__/danamon.test.ts b/lib/emailParsers/__tests__/danamon.test.ts
+new file mode 100644
+index 0000000..6e6a31c
+--- /dev/null
++++ b/lib/emailParsers/__tests__/danamon.test.ts
+@@ -0,0 +1,73 @@
++import { describe, it, expect } from "vitest";
++import { parseDanamon } from "../danamon";
++import { isSkip } from "../types";
++
++const QRIS_SUBJECT = "Pembayaran QRIS Berhasil (Tidak Perlu Dibalas)";
++const QRIS_BODY = `
++Pembayaran QRIS Berhasil
++Nasabah Yth.
++Terima kasih telah menggunakan D-Bank PRO. Dengan ini kami informasikan bahwa
++transaksi QRIS telah berhasil.
++
++Detail Transaksi
++Status Berhasil
++No. Referensi 0624355032649033
++Merchant Tujuan QR CITITRANS WEB
++Lokasi JAKARTA SELATAN, 12790, ID
++Tanggal Pembayaran 24 Juni 2026 15:48
++Acquirer BANK BNI
++Merchant PAN 9360000915040777714
++Customer PAN 9360001111400122608
++Reff ID 240625951201
++Terminal ID
++
++Detail Nominal
++Nominal Rp.360.000,00
++Jumlah Rp.360.000,00
++
++Sumber Dana
++RESTIYANA DWI ASTUTI
++BANK DANAMON *** 1768
++`;
++
++const TRANSFER_SUBJECT = "Transfer ke Rekening Lain Berhasil (Tidak Perlu Dibalas)";
++const TRANSFER_BODY = `
++Transfer ke Rekening Lain Berhasil
++Nasabah Yth.
++Terima kasih telah menggunakan D-Bank PRO. Dengan ini kami informasikan bahwa
++Transfer ke Rekening Lain telah berhasil. Berikut merupakan detail transaksi Anda:
++
++Detail Transaksi
++Status Berhasil
++No. Referensi 2026070719581198780
++Tanggal Transaksi 07 Juli 2026, 19:58
++Nama Penerima Restiyana Dwi Astuti
++Bank Tujuan BANK CENTRAL ASIA
++No. Rekening Penerima 2831816068
++Metode Transfer BI-FAST
++Tujuan Transfer Pemindahan Dana
++
++Detail Nominal
++Nominal Transaksi Rp50.000,00
++Jumlah Rp50.000,00
++`;
++
++describe("parseDanamon", () => {
++  it("parses a QRIS payment with unmapped merchant as pending Other", () => {
++    const result = parseDanamon(QRIS_SUBJECT, QRIS_BODY);
++    expect(isSkip(result)).toBe(false);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++
++    expect(result.amount).toBe(360000);
++    expect(result.date).toBe("2026-06-24");
++    expect(result.note).toBe("QR CITITRANS WEB");
++    expect(result.category).toBe("Other");
++    expect(result.pending).toBe(true);
++    expect(result.referenceId).toBe("0624355032649033");
++  });
++
++  it("skips a self-transfer entirely, regardless of body content", () => {
++    const result = parseDanamon(TRANSFER_SUBJECT, TRANSFER_BODY);
++    expect(isSkip(result)).toBe(true);
++  });
++});
+diff --git a/lib/emailParsers/__tests__/dbs.test.ts b/lib/emailParsers/__tests__/dbs.test.ts
+new file mode 100644
+index 0000000..c17fd47
+--- /dev/null
++++ b/lib/emailParsers/__tests__/dbs.test.ts
+@@ -0,0 +1,36 @@
++import { describe, it, expect } from "vitest";
++import { parseDBS } from "../dbs";
++import { isSkip } from "../types";
++
++const BODY = `
++"Please do not reply this email"
++
++Nasabah Yang Terhormat,
++
++Terima kasih atas kepercayaan Anda kepada Bank DBS Indonesia.
++
++Berikut merupakan informasi transaksi yang telah Anda lakukan:
++
++15-06-2026 15:12:10 Pembelian dari SpotifyID Kartu Debit sebesar IDR
++79.900,00 Info Customer Center 08041500327
++`;
++
++describe("parseDBS", () => {
++  it("parses the sentence-format transaction line", () => {
++    const result = parseDBS(BODY);
++    expect(isSkip(result)).toBe(false);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++
++    expect(result.amount).toBe(79900);
++    expect(result.date).toBe("2026-06-15");
++    expect(result.note).toBe("SpotifyID");
++    // SPOTIFY is a mapped merchant keyword -> Bills, not pending
++    expect(result.category).toBe("Bills");
++    expect(result.pending).toBe(false);
++    expect(result.referenceId).toBeUndefined();
++  });
++
++  it("returns null for unrecognized body shapes", () => {
++    expect(parseDBS("nothing useful here")).toBeNull();
++  });
++});
+diff --git a/lib/emailParsers/__tests__/grab.test.ts b/lib/emailParsers/__tests__/grab.test.ts
+new file mode 100644
+index 0000000..65ce8de
+--- /dev/null
++++ b/lib/emailParsers/__tests__/grab.test.ts
+@@ -0,0 +1,176 @@
++import { describe, it, expect } from "vitest";
++import { parseGrab } from "../grab";
++import { isSkip } from "../types";
++
++const SUBJECT_RECEIPT = "Your Grab E-Receipt";
++
++const RIDE_BODY = `
++Bike Standard
++Hope you enjoyed
++your ride!
++Picked up on 13 July 2026
++Booking ID: A-9J3PGDOWWEQIAV
++Total Paid RP 13.000
++Receipt issued by the driver MOHAMAD RIZKI ABDILLAH.
++Breakdown
++Fare 9.000
++Fare 12.000
++Promo -3.000
++Ride Cover opt-in 1.000
++Platform Fee 3.000
++Total Paid 13.000
++Inclusive of VAT 4.683
++VAT 464
++`;
++
++const GRABCAR_BODY = `
++GrabCar Priority (BETA)
++Congrats on getting the nearest car!
++Picked up on 14 April 2026
++Booking ID: A-97H4U86GXFOFAV
++Total Paid RP 32.000
++Receipt issued by the driver Angga Firman Candra Anggara.
++Fare 25.000
++Total Paid 32.000
++`;
++
++const GRABFOOD_BODY = `
++Selamat menikmati makanan Anda!
++TOTAL
++Rp 46100
++TANGGAL | WAKTU
++07 Jul 26 19:33 +0700
++Jenis Kendaraan:
++GrabFood
++Pesanan Dari:
++Nasi Goreng Gila Ampera 89 - Ragunan
++Visa : Rp 46100
++TOTAL (INCL. TAX)      Rp 46100
++Faktur PPN
++Biaya pemesanan   Rp 2000
++Total Diskon   Rp 1181
++PPN   Rp 81
++`;
++
++// The OVO-paid dine-in voucher shape never says "GrabFood" or "Selamat
++// menikmati makanan" — it's the tricky one caught during test-writing.
++const DINE_IN_VOUCHER_BODY = `
++Hope you enjoyed your food!
++TOTAL
++IDR 1950
++TANGGAL | WAKTU
++20 Jun 26 17:40 +0700
++Jenis pesanan:
++Dine-in Voucher
++Toma Brasserie - Sudirman
++Detail Pembayaran:
++OVO Cash
++Subtotal   IDR 1950.00
++TOTAL (INCL. TAX)      IDR 1950
++`;
++
++const TIP_SUBJECT = "Your Grab E-Receipt";
++const TIP_BODY = `
++GrabFood
++Terima kasih! Tip
++darimu sudah
++disalurkan ke
++pengemudimu.
++13 Jun 26 19:21 +0700
++Total RP 5000
++Tip
++Lokasi Penjemputan: Jl. Ah. Nasution No. 81, Cigending, Ujung Berung, Bandung.
++Kode Booking: A-9F8BD7FWXB8VAV
++5000
++Total 5000
++100% diberikan untuk pengemudimu.
++Diterbitkan oleh pengemudi
++WAHYU HIDAYAT
++Diterbitkan untuk
++Resti
++`;
++
++const EXPRESS_SUBJECT = "Struk GrabExpress-mu";
++const EXPRESS_BODY = `
++Barangmu sudah dikirim!
++TOTAL
++Rp 13000
++Tanggal
++12 Jun 26
++Jenis Kendaraan
++GrabExpress Instant
++Diterbitkan oleh Pengemudi
++RIYANTO
++Kode Booking
++A-9F3J9KQGWM7NAV
++Detail Pembayaran
++Garansi Pengantaran Rp 1000
++Biaya yang berlaku Rp 15000
++Diskon Ongkir - Rp 3000
++TOTAL Rp 13000
++Faktur PPN
++Subtotal Ongkir Rp 10000
++PPN Rp 108.80
++`;
++
++describe("parseGrab", () => {
++  it("classifies a bike ride as Transport / Grab Ride", () => {
++    const result = parseGrab(SUBJECT_RECEIPT, RIDE_BODY);
++    expect(isSkip(result)).toBe(false);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++    expect(result.amount).toBe(13000);
++    expect(result.date).toBe("2026-07-13");
++    expect(result.category).toBe("Transport");
++    expect(result.note).toBe("Grab Ride");
++    expect(result.pending).toBe(false);
++  });
++
++  it("classifies GrabCar as Transport / Grab Ride", () => {
++    const result = parseGrab(SUBJECT_RECEIPT, GRABCAR_BODY);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++    expect(result.amount).toBe(32000);
++    expect(result.date).toBe("2026-04-14");
++    expect(result.category).toBe("Transport");
++    expect(result.note).toBe("Grab Ride");
++  });
++
++  it("classifies GrabFood as Food, ignoring the nested Faktur PPN amounts", () => {
++    const result = parseGrab(SUBJECT_RECEIPT, GRABFOOD_BODY);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++    expect(result.amount).toBe(46100); // not 1181 (Total Diskon) or 2000/81
++    expect(result.date).toBe("2026-07-07");
++    expect(result.category).toBe("Food");
++    expect(result.note).toBe("GrabFood");
++  });
++
++  it("classifies an OVO-paid dine-in voucher as Food even without the GrabFood keyword", () => {
++    const result = parseGrab(SUBJECT_RECEIPT, DINE_IN_VOUCHER_BODY);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++    expect(result.amount).toBe(1950);
++    expect(result.category).toBe("Food");
++  });
++
++  it("classifies a tip as Other with the driver name in the note, not miscategorized as food", () => {
++    const result = parseGrab(TIP_SUBJECT, TIP_BODY);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++    expect(result.amount).toBe(5000);
++    expect(result.date).toBe("2026-06-13");
++    expect(result.category).toBe("Other");
++    expect(result.note).toBe("Tip - WAHYU HIDAYAT");
++    expect(result.pending).toBe(false);
++  });
++
++  it("classifies GrabExpress as Other, using only the top total not the Faktur PPN sub-amounts", () => {
++    const result = parseGrab(EXPRESS_SUBJECT, EXPRESS_BODY);
++    if (!result || isSkip(result)) throw new Error("expected a transaction");
++    expect(result.amount).toBe(13000); // not 10000, 2000, or 108.80
++    expect(result.date).toBe("2026-06-12");
++    expect(result.category).toBe("Other");
++    expect(result.note).toBe("GrabExpress");
++    expect(result.pending).toBe(false);
++  });
++
++  it("returns null when no total can be found", () => {
++    expect(parseGrab(SUBJECT_RECEIPT, "nothing useful here")).toBeNull();
++  });
++});
+diff --git a/lib/emailParsers/__tests__/normalizeAmount.test.ts b/lib/emailParsers/__tests__/normalizeAmount.test.ts
+new file mode 100644
+index 0000000..a93d585
+--- /dev/null
++++ b/lib/emailParsers/__tests__/normalizeAmount.test.ts
+@@ -0,0 +1,34 @@
++import { describe, it, expect } from "vitest";
++import { normalizeIDRAmount } from "../normalizeAmount";
++
++describe("normalizeIDRAmount", () => {
++  it("parses Grab dot-thousands format", () => {
++    expect(normalizeIDRAmount("RP 13.000")).toBe(13000);
++    expect(normalizeIDRAmount("RP 32.000")).toBe(32000);
++  });
++
++  it("parses Grab plain digits (no separators)", () => {
++    expect(normalizeIDRAmount("IDR 1950")).toBe(1950);
++    expect(normalizeIDRAmount("Rp 46100")).toBe(46100);
++    expect(normalizeIDRAmount("Rp 13000")).toBe(13000);
++    expect(normalizeIDRAmount("RP 5000")).toBe(5000);
++  });
++
++  it("parses BCA comma-thousands + dot-cents format", () => {
++    expect(normalizeIDRAmount("IDR 5,200.00")).toBe(5200);
++  });
++
++  it("parses Danamon dot-thousands + comma-cents format", () => {
++    expect(normalizeIDRAmount("Rp50.000,00")).toBe(50000);
++    expect(normalizeIDRAmount("Rp.360.000,00")).toBe(360000);
++  });
++
++  it("parses DBS dot-thousands + comma-cents format", () => {
++    expect(normalizeIDRAmount("IDR 79.900,00")).toBe(79900);
++  });
++
++  it("returns null for garbage input", () => {
++    expect(normalizeIDRAmount("")).toBeNull();
++    expect(normalizeIDRAmount("Rp -")).toBeNull();
++  });
++});
+diff --git a/lib/emailParsers/bca.ts b/lib/emailParsers/bca.ts
+new file mode 100644
+index 0000000..8e9c8c6
+--- /dev/null
++++ b/lib/emailParsers/bca.ts
+@@ -0,0 +1,55 @@
++import { normalizeIDRAmount } from "./normalizeAmount";
++import { parseEnglishAbbrevDate } from "./parseDate";
++import { categorizeMerchant } from "./merchantMap";
++import type { ParseResult } from "./types";
++
++/**
++ * Parses a BCA "Internet Transaction Journal" email (myBCA), e.g.:
++ *
++ *   Status : Berhasil
++ *   Tanggal Transaksi : 13 Jul 2026 17:15:33
++ *   Jenis Transaksi : Pembayaran QRIS
++ *   Pembayaran Ke : FMI PLAZA OLEOS
++ *   Total Bayar : IDR 5,200.00
++ *   Nomor Referensi : 9527120260713171530273QRS0849819881
++ *
++ * Only "Pembayaran" (payment/purchase) transactions are logged. Other
++ * transaction types (e.g. transfers) are skipped — we've only ever seen a
++ * QRIS payment sample, so this is an assumption to revisit if a BCA
++ * transfer-out email shows up looking like the Danamon self-transfer case.
++ */
++export function parseBCA(body: string): ParseResult {
++  const statusMatch = /Status\s*:\s*(.+)/.exec(body);
++  if (!statusMatch || !/berhasil/i.test(statusMatch[1])) {
++    return { skip: true, reason: "transaction not successful" };
++  }
++
++  const jenisMatch = /Jenis Transaksi\s*:\s*(.+)/.exec(body);
++  if (!jenisMatch || !/pembayaran/i.test(jenisMatch[1])) {
++    return { skip: true, reason: "not a payment transaction" };
++  }
++
++  const amountMatch = /Total Bayar\s*:\s*(?:IDR)?\s*([\d.,]+)/i.exec(body);
++  const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
++  if (!amount) return null;
++
++  const dateMatch = /Tanggal Transaksi\s*:\s*(.+)/.exec(body);
++  const date = dateMatch ? parseEnglishAbbrevDate(dateMatch[1]) : null;
++  if (!date) return null;
++
++  const merchantMatch = /Pembayaran Ke\s*:\s*(.+)/.exec(body);
++  const merchant = merchantMatch ? merchantMatch[1].trim() : "BCA";
++
++  const referenceMatch = /Nomor Referensi\s*:\s*(\S+)/.exec(body);
++
++  const category = categorizeMerchant(merchant);
++
++  return {
++    amount,
++    category: category ?? "Other",
++    pending: category === null,
++    note: merchant,
++    date,
++    referenceId: referenceMatch?.[1],
++  };
++}
+diff --git a/lib/emailParsers/danamon.ts b/lib/emailParsers/danamon.ts
+new file mode 100644
+index 0000000..2c9a751
+--- /dev/null
++++ b/lib/emailParsers/danamon.ts
+@@ -0,0 +1,57 @@
++import { normalizeIDRAmount } from "./normalizeAmount";
++import { parseIndonesianDate } from "./parseDate";
++import { categorizeMerchant } from "./merchantMap";
++import type { ParseResult } from "./types";
++
++/**
++ * Parses a D-Bank PRO (Danamon) email. Two shapes share the same sender:
++ *
++ *  1. "Pembayaran QRIS Berhasil" — a real purchase, has "Merchant Tujuan".
++ *     Example:
++ *       Merchant Tujuan   QR CITITRANS WEB
++ *       Tanggal Pembayaran   24 Juni 2026 15:48
++ *       Nominal   Rp.360.000,00
++ *       No. Referensi   0624355032649033
++ *
++ *  2. "Transfer ke Rekening Lain Berhasil" — a self-transfer between the
++ *     user's own accounts, not a real expense. Distinguished purely by
++ *     subject line (both shapes can otherwise look similar), so this must
++ *     be skipped before ever attempting to parse the body as a purchase.
++ */
++export function parseDanamon(subject: string, body: string): ParseResult {
++  if (/transfer ke rekening lain/i.test(subject)) {
++    return { skip: true, reason: "self-transfer, not an expense" };
++  }
++  if (!/pembayaran/i.test(subject)) {
++    return { skip: true, reason: "unrecognized Danamon email type" };
++  }
++
++  const statusMatch = /Status\s+(\S+)/.exec(body);
++  if (!statusMatch || !/berhasil/i.test(statusMatch[1])) {
++    return { skip: true, reason: "transaction not successful" };
++  }
++
++  const amountMatch = /Nominal\s+Rp\.?\s*([\d.,]+)/.exec(body);
++  const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
++  if (!amount) return null;
++
++  const dateMatch = /Tanggal Pembayaran\s+(.+)/.exec(body);
++  const date = dateMatch ? parseIndonesianDate(dateMatch[1]) : null;
++  if (!date) return null;
++
++  const merchantMatch = /Merchant Tujuan\s+(.+)/.exec(body);
++  const merchant = merchantMatch ? merchantMatch[1].trim() : "Danamon";
++
++  const referenceMatch = /No\.\s*Referensi\s+(\S+)/.exec(body);
++
++  const category = categorizeMerchant(merchant);
++
++  return {
++    amount,
++    category: category ?? "Other",
++    pending: category === null,
++    note: merchant,
++    date,
++    referenceId: referenceMatch?.[1],
++  };
++}
+diff --git a/lib/emailParsers/dbs.ts b/lib/emailParsers/dbs.ts
+new file mode 100644
+index 0000000..faa59dc
+--- /dev/null
++++ b/lib/emailParsers/dbs.ts
+@@ -0,0 +1,42 @@
++import { normalizeIDRAmount } from "./normalizeAmount";
++import { parseDashedDMYDate } from "./parseDate";
++import { categorizeMerchant } from "./merchantMap";
++import type { ParseResult } from "./types";
++
++/**
++ * Parses a DBS "Informasi Transaksi Anda" email. Unlike BCA/Danamon/Grab,
++ * DBS has no labeled fields at all — everything is one sentence:
++ *
++ *   15-06-2026 15:12:10 Pembelian dari SpotifyID Kartu Debit sebesar IDR
++ *   79.900,00 Info Customer Center 08041500327
++ *
++ * Also unlike the other sources, DBS emails carry no transaction reference
++ * number — dedupe for this source relies entirely on the caller's Gmail
++ * messageId (see /api/email), not on anything extracted here.
++ */
++export function parseDBS(body: string): ParseResult {
++  const match =
++    /(\d{2}-\d{2}-\d{4})\s+\d{2}:\d{2}:\d{2}\s+Pembelian dari\s+(.+?)\s+Kartu Debit sebesar IDR\s+([\d.,]+)/.exec(
++      body
++    );
++  if (!match) return null;
++
++  const [, dateRaw, merchantRaw, amountRaw] = match;
++
++  const amount = normalizeIDRAmount(amountRaw);
++  if (!amount) return null;
++
++  const date = parseDashedDMYDate(dateRaw);
++  if (!date) return null;
++
++  const merchant = merchantRaw.trim();
++  const category = categorizeMerchant(merchant);
++
++  return {
++    amount,
++    category: category ?? "Other",
++    pending: category === null,
++    note: merchant,
++    date,
++  };
++}
+diff --git a/lib/emailParsers/grab.ts b/lib/emailParsers/grab.ts
+new file mode 100644
+index 0000000..68d56b9
+--- /dev/null
++++ b/lib/emailParsers/grab.ts
+@@ -0,0 +1,99 @@
++import { normalizeIDRAmount } from "./normalizeAmount";
++import { parseEnglishAbbrevDate } from "./parseDate";
++import type { ParseResult } from "./types";
++
++/**
++ * Every Grab product shares the same sender (no-reply@grab.com) and mostly
++ * the same subject ("Your Grab E-Receipt"), so type is detected from body
++ * text instead. Order matters: check the most specific keyword first.
++ */
++type GrabType = "express" | "tip" | "food" | "car" | "ride";
++
++function detectGrabType(subject: string, body: string): GrabType {
++  const text = `${subject}\n${body}`;
++  if (/GrabExpress/i.test(text)) return "express";
++  if (/Tip\s+darimu\s+sudah\s+disalurkan/i.test(text)) return "tip";
++  if (
++    /GrabFood|Selamat\s+menikmati\s+makanan|Dine-in\s+Voucher|Hope\s+you\s+enjoyed\s+your\s+food/i.test(
++      text
++    )
++  )
++    return "food";
++  if (/GrabCar/i.test(text)) return "car";
++  return "ride"; // Bike Standard / other 2-wheeler ride types
++}
++
++/**
++ * The hero total appears near the top of every Grab email as either
++ * "Total Paid RP 13.000" (ride/car) or "TOTAL\nIDR 1950" / "TOTAL\nRp 46100"
++ * (food/express/tip). Later in the same email, Faktur PPN (tax invoice)
++ * sections repeat sub-amounts under labels like "Total Diskon" — since
++ * regex.exec takes the leftmost match and the hero total always appears
++ * first in the body, those nested amounts are never picked up.
++ */
++function extractTotal(body: string): number | null {
++  const match =
++    /Total(?:\s+Paid)?\s*[:\s]*\s*(?:RP|Rp|IDR)?\.?\s*([\d.,]+)/i.exec(body);
++  return match ? normalizeIDRAmount(match[1]) : null;
++}
++
++function extractDriverName(body: string): string | null {
++  const match = /Diterbitkan oleh pengemudi\s+([^\n]+)/.exec(body);
++  return match ? match[1].trim() : null;
++}
++
++export function parseGrab(subject: string, body: string): ParseResult {
++  const amount = extractTotal(body);
++  if (!amount) return null;
++
++  const date = parseEnglishAbbrevDate(body);
++  if (!date) return null;
++
++  const referenceMatch =
++    /(?:Booking ID|Kode Booking|Pesanan ID)\s*:?\s*\n?\s*(\S+)/.exec(body);
++  const referenceId = referenceMatch?.[1];
++
++  const type = detectGrabType(subject, body);
++
++  switch (type) {
++    case "express":
++      return {
++        amount,
++        category: "Other",
++        pending: false,
++        note: "GrabExpress",
++        date,
++        referenceId,
++      };
++    case "tip": {
++      const driver = extractDriverName(body);
++      return {
++        amount,
++        category: "Other",
++        pending: false,
++        note: driver ? `Tip - ${driver}` : "Grab Tip",
++        date,
++        referenceId,
++      };
++    }
++    case "food":
++      return {
++        amount,
++        category: "Food",
++        pending: false,
++        note: "GrabFood",
++        date,
++        referenceId,
++      };
++    case "car":
++    case "ride":
++      return {
++        amount,
++        category: "Transport",
++        pending: false,
++        note: "Grab Ride",
++        date,
++        referenceId,
++      };
++  }
++}
+diff --git a/lib/emailParsers/index.ts b/lib/emailParsers/index.ts
+new file mode 100644
+index 0000000..160e06c
+--- /dev/null
++++ b/lib/emailParsers/index.ts
+@@ -0,0 +1,28 @@
++import { parseBCA } from "./bca";
++import { parseDanamon } from "./danamon";
++import { parseDBS } from "./dbs";
++import { parseGrab } from "./grab";
++import type { ParseResult } from "./types";
++
++export type { ParseResult, ParsedEmailTransaction } from "./types";
++export { isSkip } from "./types";
++
++/**
++ * Routes an email to the right source parser based on sender address.
++ * Returns null if the sender isn't a recognized source at all (distinct
++ * from a recognized source that failed to parse — see parser docstrings).
++ */
++export function parseSourceEmail(
++  from: string,
++  subject: string,
++  body: string
++): ParseResult {
++  const sender = from.toLowerCase();
++
++  if (sender.includes("bca.co.id")) return parseBCA(body);
++  if (sender.includes("danamon.co.id")) return parseDanamon(subject, body);
++  if (sender.includes("dbs.com")) return parseDBS(body);
++  if (sender.includes("grab.com")) return parseGrab(subject, body);
++
++  return null;
++}
+diff --git a/lib/emailParsers/merchantMap.ts b/lib/emailParsers/merchantMap.ts
+new file mode 100644
+index 0000000..618b426
+--- /dev/null
++++ b/lib/emailParsers/merchantMap.ts
+@@ -0,0 +1,44 @@
++import type { DailyExpenseCategory } from "@/types";
++
++/**
++ * Merchant keyword -> category, per PRD_Auto_Log_Bank_Emails.md section 6.
++ * Case-insensitive partial match; first match in this list wins.
++ * Categories use the app's real casing (types/index.ts), not the PRD's
++ * lowercase examples.
++ */
++const MERCHANT_KEYWORDS: Array<[string, DailyExpenseCategory]> = [
++  ["GRAB", "Transport"],
++  ["GOJEK", "Transport"],
++  ["BLUE BIRD", "Transport"],
++  ["STARBUCKS", "Food"],
++  ["MCDONALD", "Food"],
++  ["KFC", "Food"],
++  ["INDOMARET", "Food"],
++  ["ALFAMART", "Food"],
++  ["NETFLIX", "Bills"],
++  ["SPOTIFY", "Bills"],
++  ["PLN", "Bills"],
++  ["PDAM", "Bills"],
++  ["TOKOPEDIA", "Shopping"],
++  ["SHOPEE", "Shopping"],
++  ["LAZADA", "Shopping"],
++  ["CINEMAXX", "Entertainment"],
++  ["CGV", "Entertainment"],
++  ["TIX ID", "Entertainment"],
++  ["KIMIA FARMA", "Health"],
++  ["APOTEK", "Health"],
++];
++
++/**
++ * Looks up a category for a merchant/description string. Returns null if no
++ * keyword matches — caller should log as category "Other", pending: true.
++ */
++export function categorizeMerchant(
++  merchant: string
++): DailyExpenseCategory | null {
++  const upper = merchant.toUpperCase();
++  for (const [keyword, category] of MERCHANT_KEYWORDS) {
++    if (upper.includes(keyword)) return category;
++  }
++  return null;
++}
+diff --git a/lib/emailParsers/normalizeAmount.ts b/lib/emailParsers/normalizeAmount.ts
+new file mode 100644
+index 0000000..30e38eb
+--- /dev/null
++++ b/lib/emailParsers/normalizeAmount.ts
+@@ -0,0 +1,26 @@
++/**
++ * Normalizes an IDR amount string from a bank/e-wallet email into a plain
++ * number of rupiah. Handles every format seen across sources:
++ *   "13.000"      (Grab, dot as thousands sep, no decimals)     -> 13000
++ *   "IDR 5,200.00" (BCA, comma thousands + dot cents)           -> 5200
++ *   "Rp.360.000,00" (Danamon, dot thousands + comma cents)      -> 360000
++ *   "1950"         (Grab, no separators)                        -> 1950
++ *
++ * Rule: if the string ends in a separator followed by exactly two digits,
++ * that's a cents/decimal group — for IDR receipts these are always ".00" or
++ * ",00", so we simply drop them. Any other "." or "," is a thousands
++ * separator and gets stripped.
++ */
++export function normalizeIDRAmount(raw: string): number | null {
++  const stripped = raw.replace(/[^\d.,]/g, "");
++  if (!stripped) return null;
++
++  const centsMatch = /^(.*)[.,]\d{2}$/.exec(stripped);
++  const withoutCents = centsMatch ? centsMatch[1] : stripped;
++
++  const digitsOnly = withoutCents.replace(/[.,]/g, "");
++  if (!digitsOnly) return null;
++
++  const value = Number(digitsOnly);
++  return Number.isFinite(value) && value > 0 ? value : null;
++}
+diff --git a/lib/emailParsers/parseDate.ts b/lib/emailParsers/parseDate.ts
+new file mode 100644
+index 0000000..7c274d8
+--- /dev/null
++++ b/lib/emailParsers/parseDate.ts
+@@ -0,0 +1,53 @@
++const ENGLISH_MONTHS: Record<string, string> = {
++  jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
++  jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
++};
++
++const INDONESIAN_MONTHS: Record<string, string> = {
++  januari: "01", februari: "02", maret: "03", april: "04", mei: "05",
++  juni: "06", juli: "07", agustus: "08", september: "09", oktober: "10",
++  november: "11", desember: "12",
++};
++
++const ENGLISH_MONTH_PATTERN = Object.keys(ENGLISH_MONTHS).join("|");
++
++/**
++ * "13 Jul 2026" / "13 Jul 26" -> "2026-07-13" (BCA, Grab).
++ *
++ * The month must be a real abbreviation (not any 3 letters) and the day
++ * number can't be preceded by another digit — without both guards this can
++ * false-positive on unrelated text, e.g. matching the trailing "00" in
++ * "Rp 13000\nTanggal\n12 Jun 26" as a fake day before ever reaching the
++ * real "12 Jun 26" date that follows.
++ */
++export function parseEnglishAbbrevDate(text: string): string | null {
++  const re = new RegExp(
++    `(?<!\\d)(\\d{1,2})\\s+(${ENGLISH_MONTH_PATTERN})[a-z]*\\s+(\\d{2,4})`,
++    "i"
++  );
++  const match = re.exec(text);
++  if (!match) return null;
++  const [, day, monAbbrev, yearRaw] = match;
++  const month = ENGLISH_MONTHS[monAbbrev.toLowerCase()];
++  if (!month) return null;
++  const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
++  return `${year}-${month}-${day.padStart(2, "0")}`;
++}
++
++/** "24 Juni 2026" -> "2026-06-24" (Danamon). */
++export function parseIndonesianDate(text: string): string | null {
++  const match = /(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/.exec(text);
++  if (!match) return null;
++  const [, day, monName, year] = match;
++  const month = INDONESIAN_MONTHS[monName.toLowerCase()];
++  if (!month) return null;
++  return `${year}-${month}-${day.padStart(2, "0")}`;
++}
++
++/** "15-06-2026" (DD-MM-YYYY) -> "2026-06-15" (DBS). */
++export function parseDashedDMYDate(text: string): string | null {
++  const match = /(\d{2})-(\d{2})-(\d{4})/.exec(text);
++  if (!match) return null;
++  const [, day, month, year] = match;
++  return `${year}-${month}-${day}`;
++}
+diff --git a/lib/emailParsers/types.ts b/lib/emailParsers/types.ts
+new file mode 100644
+index 0000000..931c00d
+--- /dev/null
++++ b/lib/emailParsers/types.ts
+@@ -0,0 +1,32 @@
++/**
++ * Result of parsing a single source email. Distinguishes three outcomes,
++ * per PRD_Auto_Log_Bank_Emails.md section 7.3:
++ *  - a real transaction to log (category may be "Other" + pending: true if
++ *    the merchant is unrecognized, or pending: false if we positively
++ *    identified it as something we deliberately bucket under "Other", e.g.
++ *    a Grab tip or GrabExpress delivery)
++ *  - `{ skip: true }` — recognized but intentionally not logged (e.g. a
++ *    Danamon self-transfer)
++ *  - `null` — could not parse at all (e.g. amount unparseable); caller
++ *    should not create a record
++ */
++export interface ParsedEmailTransaction {
++  amount: number;
++  category: string;
++  pending: boolean;
++  note: string;
++  date: string; // YYYY-MM-DD
++  /** Reference/booking number for logging/debugging, not used for dedupe. */
++  referenceId?: string;
++}
++
++export type ParseResult =
++  | ParsedEmailTransaction
++  | { skip: true; reason: string }
++  | null;
++
++export function isSkip(
++  result: ParseResult
++): result is { skip: true; reason: string } {
++  return result !== null && "skip" in result;
++}
+diff --git a/lib/telegram/categories.ts b/lib/telegram/categories.ts
+index b743e0a..47697c3 100644
+--- a/lib/telegram/categories.ts
++++ b/lib/telegram/categories.ts
+@@ -21,6 +21,8 @@ export const DAILY_EXPENSE_CATEGORY_KEYWORDS: Record<string, string> = {
+   belanja: "Shopping",
+   health: "Health",
+   kesehatan: "Health",
++  entertainment: "Entertainment",
++  hiburan: "Entertainment",
+   other: "Other",
+   lainnya: "Other",
+ };
+diff --git a/lib/telegram/handleUpdate.ts b/lib/telegram/handleUpdate.ts
+index 1e1df72..a73b4a4 100644
+--- a/lib/telegram/handleUpdate.ts
++++ b/lib/telegram/handleUpdate.ts
+@@ -199,7 +199,7 @@ async function processLine(
+   }
+ }
+ 
+-function buildCategoryKeyboard(
++export function buildCategoryKeyboard(
+   dailyTransactionId: string,
+   type: "income" | "expense"
+ ): InlineKeyboardMarkup {
+diff --git a/types/index.ts b/types/index.ts
+index 6179668..dc9108d 100644
+--- a/types/index.ts
++++ b/types/index.ts
+@@ -15,6 +15,7 @@ export const DAILY_EXPENSE_CATEGORIES = [
+   "Bills",
+   "Shopping",
+   "Health",
++  "Entertainment",
+   "Other",
+ ] as const;
+ 
+@@ -36,6 +37,12 @@ export interface DailyTransaction {
+   note: string;
+   date: string; // YYYY-MM-DD
+   createdAt: string; // ISO timestamp
++  /**
++   * Gmail message ID, present only for transactions created by the
++   * auto-log-from-email pipeline. Used to dedupe against retries/re-sent
++   * emails — absent (undefined) for Telegram-created entries.
++   */
++  sourceMessageId?: string;
+ }
+ 
+ export interface DailyTransactionDecrypted
+diff --git a/vercel.json b/vercel.json
+new file mode 100644
+index 0000000..f965640
+--- /dev/null
++++ b/vercel.json
+@@ -0,0 +1,8 @@
++{
++  "crons": [
++    {
++      "path": "/api/cron/digest",
++      "schedule": "0 13 * * *"
++    }
++  ]
++}

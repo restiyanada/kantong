@@ -8,6 +8,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   Bills: "#B8862B",
   Shopping: "#2E8F94",
   Health: "#C15FA0",
+  Entertainment: "#C1622E",
   Other: "#6B6D70",
   Salary: "#1E7A5F",
   "Other Income": "#2E8F94",

@@ -15,6 +15,7 @@ export const DAILY_EXPENSE_CATEGORIES = [
   "Bills",
   "Shopping",
   "Health",
+  "Entertainment",
   "Other",
 ] as const;
 
@@ -36,6 +37,12 @@ export interface DailyTransaction {
   note: string;
   date: string; // YYYY-MM-DD
   createdAt: string; // ISO timestamp
+  /**
+   * Gmail message ID, present only for transactions created by the
+   * auto-log-from-email pipeline. Used to dedupe against retries/re-sent
+   * emails — absent (undefined) for Telegram-created entries.
+   */
+  sourceMessageId?: string;
 }
 
 export interface DailyTransactionDecrypted
