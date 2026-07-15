@@ -3,6 +3,16 @@ const ENGLISH_MONTHS: Record<string, string> = {
   jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
 };
 
+// BCA writes dates using Indonesian 3-letter abbreviations. Most overlap
+// with English (Jan, Feb, Mar, Apr, Jun, Jul, Sep, Nov), but four don't:
+// Mei/Agu/Okt/Des vs May/Aug/Oct/Dec — those four silently failed to parse
+// under the English-only parser (only ever caught because a July 2026
+// sample happened to share the same abbreviation in both languages).
+const INDONESIAN_MONTH_ABBREV: Record<string, string> = {
+  jan: "01", feb: "02", mar: "03", apr: "04", mei: "05", jun: "06",
+  jul: "07", agu: "08", sep: "09", okt: "10", nov: "11", des: "12",
+};
+
 const INDONESIAN_MONTHS: Record<string, string> = {
   januari: "01", februari: "02", maret: "03", april: "04", mei: "05",
   juni: "06", juli: "07", agustus: "08", september: "09", oktober: "10",
@@ -34,7 +44,24 @@ export function parseEnglishAbbrevDate(text: string): string | null {
   return `${year}-${month}-${day.padStart(2, "0")}`;
 }
 
-/** "24 Juni 2026" -> "2026-06-24" (Danamon). */
+/**
+ * "26 Mei 2026" / "13 Jul 2026" -> "2026-05-26" (BCA — Indonesian 3-letter
+ * month abbreviations, not English). Same lookbehind protection as
+ * parseEnglishAbbrevDate, for the same reason.
+ */
+export function parseIndonesianAbbrevDate(text: string): string | null {
+  const pattern = Object.keys(INDONESIAN_MONTH_ABBREV).join("|");
+  const re = new RegExp(`(?<!\\d)(\\d{1,2})\\s+(${pattern})[a-z]*\\s+(\\d{2,4})`, "i");
+  const match = re.exec(text);
+  if (!match) return null;
+  const [, day, monAbbrev, yearRaw] = match;
+  const month = INDONESIAN_MONTH_ABBREV[monAbbrev.toLowerCase()];
+  if (!month) return null;
+  const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
+  return `${year}-${month}-${day.padStart(2, "0")}`;
+}
+
+/** "24 Juni 2026" -> "2026-06-24" (Danamon — full Indonesian month names). */
 export function parseIndonesianDate(text: string): string | null {
   const match = /(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/.exec(text);
   if (!match) return null;
