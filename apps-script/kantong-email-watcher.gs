@@ -33,6 +33,12 @@ const KNOWN_SENDERS = [
   "no-reply@grab.com",
 ];
 const MAX_THREADS_PER_RUN = 50;
+// Only look at emails from the historical-import start date onward
+// (kantong-prd.md section 2: "Import ~2 weeks of historical data since
+// June 25"). Without this, a fresh Gmail search with no date bound walks
+// the entire mailbox history for these senders.
+const SEARCH_AFTER_DATE = "2026/06/25";
+const SEARCH_AFTER_CUTOFF = new Date("2026-06-25T00:00:00+07:00"); // WIB
 
 /** Entry point — run manually once, then on the recurring trigger. */
 function processKantongEmails() {
@@ -49,7 +55,7 @@ function processKantongEmails() {
 
   const processedLabel = getOrCreateProcessedLabel();
   const senderQuery = KNOWN_SENDERS.map((s) => `from:${s}`).join(" OR ");
-  const query = `(${senderQuery}) -label:${PROCESSED_LABEL_NAME}`;
+  const query = `(${senderQuery}) -label:${PROCESSED_LABEL_NAME} after:${SEARCH_AFTER_DATE}`;
 
   const threads = GmailApp.search(query, 0, MAX_THREADS_PER_RUN);
   Logger.log(`Found ${threads.length} unprocessed thread(s).`);
@@ -70,6 +76,20 @@ function processThread(thread, apiUrl, apiSecret) {
   let allOk = true;
 
   for (const message of thread.getMessages()) {
+    // Gmail's "after:" search operator matches if ANY message in a thread
+    // is recent enough, then returns the WHOLE thread — including much
+    // older messages. Senders like BCA reuse the same subject line
+    // ("Internet Transaction Journal") for every transaction ever, so
+    // Gmail threads months of unrelated transactions together. Without
+    // this per-message check, old messages sneak past the query-level
+    // date filter and get sent to /api/email anyway.
+    if (message.getDate() < SEARCH_AFTER_CUTOFF) {
+      Logger.log(
+        `[skip-old] ${message.getId()}: dated ${message.getDate()}, before cutoff`
+      );
+      continue;
+    }
+
     const payload = {
       from: message.getFrom(),
       subject: message.getSubject(),
