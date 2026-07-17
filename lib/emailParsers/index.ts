@@ -1,5 +1,6 @@
 import { parseBCA } from "./bca";
 import { parseDanamon } from "./danamon";
+import { parseBCACreditCard } from "./bcaCreditCard";
 import { parseDBS } from "./dbs";
 import { parseGrab } from "./grab";
 import type { ParseResult } from "./types";
@@ -19,6 +20,7 @@ export function parseSourceEmail(
 ): ParseResult {
   const sender = from.toLowerCase();
 
+  if (sender.includes("klikbca.com")) return parseBCACreditCard(body);
   if (sender.includes("bca.co.id")) return parseBCA(body);
   if (sender.includes("danamon.co.id")) return parseDanamon(subject, body);
   if (sender.includes("dbs.com")) return parseDBS(body);

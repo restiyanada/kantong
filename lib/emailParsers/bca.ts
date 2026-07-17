@@ -61,6 +61,14 @@ function parsePembayaranOrVA(
   if (/transfer ke bca virtual account/i.test(jenis)) {
     return { skip: true, reason: "e-wallet top-up, logged manually by user" };
   }
+  if (/kartu kredit.*paylater/i.test(jenis)) {
+    // Paying off a credit card bill isn't new spending — the individual
+    // purchases were already captured when they happened (e.g. via a
+    // dedicated credit-card-transaction email, or Grab's own email for
+    // Grab charges). Logging the bill payment too would double-count
+    // every purchase that made up the bill.
+    return { skip: true, reason: "credit card bill payment, not new spending" };
+  }
   if (!/pembayaran/i.test(jenis)) {
     return { skip: true, reason: "not a payment transaction" };
   }

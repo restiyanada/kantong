@@ -28,6 +28,7 @@
 const PROCESSED_LABEL_NAME = "kantong-processed";
 const KNOWN_SENDERS = [
   "bca@bca.co.id",
+  "kartukreditbca@klikbca.com", // BCA credit card transaction notifications
   "dbank.app@danamon.co.id",
   "dbsindonesia@1bank.dbs.com",
   "no-reply@grab.com",

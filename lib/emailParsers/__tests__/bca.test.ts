@@ -49,6 +49,16 @@ Nominal Tujuan : IDR 500,000.00
 Nomor Referensi : SOME-REF-ID
 `;
 
+const CC_BILL_PAYMENT_BODY = `
+Status : Berhasil
+Tanggal Transaksi : 04 Jul 2026 19:06:08
+Jenis Transaksi : Kartu Kredit & Paylater - BCA
+Jumlah Tagihan : IDR 3,333,569.00
+Total Bayar : IDR 3,333,569.00
+Sisa Tagihan : IDR 0.00
+Nomor Referensi : 9527120260704190608734TPP0930752300
+`;
+
 describe("parseBCA", () => {
   it("parses a QRIS payment (English-coincidental month abbreviation)", () => {
     const result = parseBCA(QRIS_BODY_JULY);
@@ -86,6 +96,11 @@ describe("parseBCA", () => {
 
   it("skips a transfer where the recipient is the user themself", () => {
     const result = parseBCA(SELF_TRANSFER_BODY);
+    expect(isSkip(result)).toBe(true);
+  });
+
+  it("skips a credit card bill payment — settling a bill isn't new spending", () => {
+    const result = parseBCA(CC_BILL_PAYMENT_BODY);
     expect(isSkip(result)).toBe(true);
   });
 
