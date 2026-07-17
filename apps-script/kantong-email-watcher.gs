@@ -31,6 +31,7 @@ const KNOWN_SENDERS = [
   "kartukreditbca@klikbca.com", // BCA credit card transaction notifications
   "dbank.app@danamon.co.id",
   "dbsindonesia@1bank.dbs.com",
+  "digibankid@dbs.com", // newer DBS "digibank" sender, separate from the above
   "no-reply@grab.com",
 ];
 const MAX_THREADS_PER_RUN = 50;
