@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  BarChart,
-  Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -25,7 +25,13 @@ export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <AreaChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#B23B3B" stopOpacity={0.18} />
+              <stop offset="100%" stopColor="#B23B3B" stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <CartesianGrid stroke="#EFEFEC" vertical={false} />
           <XAxis
             dataKey="date"
@@ -49,8 +55,15 @@ export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
               fontSize: 12,
             }}
           />
-          <Bar dataKey="expense" fill="#B23B3B" radius={[3, 3, 0, 0]} animationDuration={400} />
-        </BarChart>
+          <Area
+            type="monotone"
+            dataKey="expense"
+            stroke="#B23B3B"
+            strokeWidth={2.25}
+            fill="url(#spendFill)"
+            animationDuration={400}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );
