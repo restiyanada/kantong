@@ -51,8 +51,7 @@ export function parseEnglishAbbrevDate(text: string): string | null {
  */
 export function parseIndonesianAbbrevDate(text: string): string | null {
   const pattern = Object.keys(INDONESIAN_MONTH_ABBREV).join("|");
-  const re = new RegExp(`(?<!\\d)(\\d{1,2})\\s+(${pattern})[a-z]*\\s+(\\d{2,4})`, "i");
-  const match = re.exec(text);
+  const re = new RegExp(`(?<!\\d)(\\d{1,2})[\\s-]+(${pattern})[a-z]*[\\s-]+(\\d{2,4})`, "i");  const match = re.exec(text);
   if (!match) return null;
   const [, day, monAbbrev, yearRaw] = match;
   const month = INDONESIAN_MONTH_ABBREV[monAbbrev.toLowerCase()];
