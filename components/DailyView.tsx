@@ -7,7 +7,6 @@ import {
   filterByTimeRange,
   computeCategoryBreakdown,
   computeMonthlyTotals,
-  computeDailyBalance,
   type TimeRange,
 } from "@/lib/aggregations";
 import { monthOf } from "@/lib/month";
@@ -30,7 +29,6 @@ export function DailyView({
   const [range, setRange] = useState<TimeRange>("1M");
   const [month, setMonth] = useState(monthOf(todayISO));
 
-  const balance = useMemo(() => computeDailyBalance(transactions), [transactions]);
   const dailySpend = useMemo(() => computeDailySpend(transactions), [transactions]);
   const chartPoints = useMemo(
     () => filterByTimeRange(dailySpend, range, todayISO),
@@ -47,14 +45,7 @@ export function DailyView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <BalanceCard
-        label="Daily balance"
-        balance={balance}
-        stats={[
-          { label: "Income this month", value: monthlyTotals.income, tone: "positive" },
-          { label: "Expense this month", value: monthlyTotals.expense, tone: "negative" },
-        ]}
-      />
+      <BalanceCard label="Spending this month" balance={monthlyTotals.expense} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
         <Panel className="lg:col-span-3">

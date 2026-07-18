@@ -99,16 +99,6 @@ export function computeMonthlyTotals(
   return { income, expense };
 }
 
-/** All-time Daily balance (not scoped to a month — this is the running total). */
-export function computeDailyBalance(
-  transactions: Pick<DailyTransactionDecrypted, "type" | "amount">[]
-): number {
-  return transactions.reduce(
-    (sum, t) => sum + (t.type === "income" ? t.amount : -t.amount),
-    0
-  );
-}
-
 export interface TransactionFilter {
   month?: string; // YYYY-MM
   type?: "all" | "income" | "expense";

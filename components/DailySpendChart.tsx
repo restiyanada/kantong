@@ -9,7 +9,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatShortDate } from "@/lib/format";
 import type { DailySpendPoint } from "@/lib/aggregations";
 
 export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
@@ -35,6 +35,7 @@ export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
           <CartesianGrid stroke="#EFEFEC" vertical={false} />
           <XAxis
             dataKey="date"
+            tickFormatter={formatShortDate}
             tick={{ fontSize: 11, fill: "#8A8C8E" }}
             tickLine={false}
             axisLine={{ stroke: "#EAEAE6" }}
@@ -48,6 +49,7 @@ export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
           />
           <Tooltip
             formatter={(value) => formatIDR(Number(value))}
+            labelFormatter={(label) => formatShortDate(String(label))}
             contentStyle={{
               borderRadius: 10,
               border: "1px solid #EAEAE6",

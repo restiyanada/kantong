@@ -4,7 +4,6 @@ import {
   filterByTimeRange,
   computeCategoryBreakdown,
   computeMonthlyTotals,
-  computeDailyBalance,
   filterDailyTransactions,
   computeSavingsBalance,
   computeDepositoTotal,
@@ -102,18 +101,6 @@ describe("computeMonthlyTotals", () => {
       income: 5000000,
       expense: 124999,
     });
-  });
-});
-
-describe("computeDailyBalance", () => {
-  it("nets income and expense across all time", () => {
-    expect(
-      computeDailyBalance([
-        { type: "income", amount: 1000 },
-        { type: "expense", amount: 400 },
-        { type: "income", amount: 200 },
-      ])
-    ).toBe(800);
   });
 });
 
