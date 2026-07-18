@@ -6,8 +6,12 @@ import type { ParseResult } from "./types";
  * Every Grab product shares the same sender (no-reply@grab.com) and mostly
  * the same subject ("Your Grab E-Receipt"), so type is detected from body
  * text instead. Order matters: check the most specific keyword first.
+ *
+ * Car vs Bike is matched loosely on the header line under the receipt title
+ * (e.g. "GrabCar Priority (BETA)", "Bike Standard") — service tier
+ * (Priority/Saver/Protect/etc) is ignored, only the Car/Bike keyword matters.
  */
-type GrabType = "express" | "tip" | "food" | "car" | "ride";
+type GrabType = "express" | "tip" | "food" | "car" | "bike";
 
 function detectGrabType(subject: string, body: string): GrabType {
   const text = `${subject}\n${body}`;
@@ -20,7 +24,7 @@ function detectGrabType(subject: string, body: string): GrabType {
   )
     return "food";
   if (/GrabCar/i.test(text)) return "car";
-  return "ride"; // Bike Standard / other 2-wheeler ride types
+  return "bike"; // Bike Standard / other 2-wheeler ride types
 }
 
 /**
@@ -40,6 +44,32 @@ function extractTotal(body: string): number | null {
 function extractDriverName(body: string): string | null {
   const match = /Diterbitkan oleh pengemudi\s+([^\n]+)/.exec(body);
   return match ? match[1].trim() : null;
+}
+
+/** Restaurant name from the "Pesanan Dari:" line (GrabFood receipts only). */
+function extractRestaurant(body: string): string | null {
+  const match = /Pesanan Dari:\s*\n([^\n]+)/.exec(body);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Pickup and destination from the "Your Trip" section. The two location
+ * names are each immediately followed by a time (e.g. "6:57PM"), which
+ * distinguishes them from the distance/duration summary line above them
+ * and any decorative timeline markers in between.
+ */
+function extractTripLocations(
+  body: string
+): { pickup: string; destination: string } | null {
+  const tripIndex = body.search(/Your Trip/i);
+  if (tripIndex === -1) return null;
+
+  const section = body.slice(tripIndex);
+  const locationRegex = /([^\n]+)\n\s*\d{1,2}:\d{2}\s*[AP]M/g;
+  const matches = [...section.matchAll(locationRegex)];
+  if (matches.length < 2) return null;
+
+  return { pickup: matches[0][1].trim(), destination: matches[1][1].trim() };
 }
 
 export function parseGrab(subject: string, body: string): ParseResult {
@@ -76,24 +106,29 @@ export function parseGrab(subject: string, body: string): ParseResult {
         referenceId,
       };
     }
-    case "food":
+    case "food": {
+      const restaurant = extractRestaurant(body);
       return {
         amount,
         category: "Food",
         pending: false,
-        note: "GrabFood",
+        note: restaurant ? `Grab Food - ${restaurant}` : "GrabFood",
         date,
         referenceId,
       };
+    }
     case "car":
-    case "ride":
+    case "bike": {
+      const label = type === "car" ? "Grab Car" : "Grab Bike";
+      const trip = extractTripLocations(body);
       return {
         amount,
         category: "Transport",
         pending: false,
-        note: "Grab Ride",
+        note: trip ? `${label} from ${trip.pickup} to ${trip.destination}` : label,
         date,
         referenceId,
       };
+    }
   }
 }
