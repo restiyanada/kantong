@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  computeRunningBalance,
+  computeDailySpend,
   filterByTimeRange,
   computeCategoryBreakdown,
   computeMonthlyTotals,
@@ -27,17 +27,23 @@ function daily(overrides: Partial<DailyTransactionDecrypted>): DailyTransactionD
   };
 }
 
-describe("computeRunningBalance", () => {
-  it("accumulates income and expense chronologically, collapsing same-day entries", () => {
-    const points = computeRunningBalance([
+describe("computeDailySpend", () => {
+  it("sums expense only per day, ignoring income, sorted chronologically", () => {
+    const points = computeDailySpend([
       { date: "2026-07-02", type: "expense", amount: 100 },
       { date: "2026-07-01", type: "income", amount: 1000 },
-      { date: "2026-07-02", type: "income", amount: 50 },
+      { date: "2026-07-01", type: "expense", amount: 40 },
+      { date: "2026-07-02", type: "expense", amount: 50 },
     ]);
     expect(points).toEqual([
-      { date: "2026-07-01", balance: 1000 },
-      { date: "2026-07-02", balance: 950 }, // 1000 - 100 + 50
+      { date: "2026-07-01", expense: 40 },
+      { date: "2026-07-02", expense: 150 },
     ]);
+  });
+
+  it("omits days with no expense activity", () => {
+    const points = computeDailySpend([{ date: "2026-07-01", type: "income", amount: 1000 }]);
+    expect(points).toEqual([]);
   });
 });
 

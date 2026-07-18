@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { DailyTransactionDecrypted } from "@/types";
 import {
-  computeRunningBalance,
+  computeDailySpend,
   filterByTimeRange,
   computeCategoryBreakdown,
   computeMonthlyTotals,
@@ -14,7 +14,7 @@ import { monthOf } from "@/lib/month";
 import { categoryColor } from "@/lib/categoryColors";
 import { BalanceCard } from "./BalanceCard";
 import { TimeRangeTabs } from "./TimeRangeTabs";
-import { BalanceChart } from "./BalanceChart";
+import { DailySpendChart } from "./DailySpendChart";
 import { AllocationList } from "./AllocationList";
 import { MonthNav } from "./MonthNav";
 import { DailyTransactionList } from "./DailyTransactionList";
@@ -31,10 +31,10 @@ export function DailyView({
   const [month, setMonth] = useState(monthOf(todayISO));
 
   const balance = useMemo(() => computeDailyBalance(transactions), [transactions]);
-  const runningBalance = useMemo(() => computeRunningBalance(transactions), [transactions]);
+  const dailySpend = useMemo(() => computeDailySpend(transactions), [transactions]);
   const chartPoints = useMemo(
-    () => filterByTimeRange(runningBalance, range, todayISO),
-    [runningBalance, range, todayISO]
+    () => filterByTimeRange(dailySpend, range, todayISO),
+    [dailySpend, range, todayISO]
   );
   const monthlyTotals = useMemo(
     () => computeMonthlyTotals(transactions, month),
@@ -59,10 +59,10 @@ export function DailyView({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
         <Panel className="lg:col-span-3">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-[#1A1B1E]">Balance over time</h2>
+            <h2 className="text-sm font-medium text-[#1A1B1E]">Daily spending</h2>
             <TimeRangeTabs value={range} onChange={setRange} />
           </div>
-          <BalanceChart points={chartPoints} />
+          <DailySpendChart points={chartPoints} />
         </Panel>
 
         <Panel className="lg:col-span-2">

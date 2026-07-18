@@ -5,29 +5,25 @@ import type {
   DepositoCertificateDecrypted,
 } from "@/types";
 
-// ---- Daily: running balance chart ----------------------------------------
+// ---- Daily: daily spend chart ----------------------------------------
 
-export interface RunningBalancePoint {
+export interface DailySpendPoint {
   date: string;
-  balance: number;
+  expense: number;
 }
 
-/** Cumulative balance over time, one point per day that has activity. */
-export function computeRunningBalance(
+/** Total expense per day (income excluded). One point per day with expense activity. */
+export function computeDailySpend(
   transactions: Pick<DailyTransactionDecrypted, "date" | "type" | "amount">[]
-): RunningBalancePoint[] {
-  const netByDate = new Map<string, number>();
+): DailySpendPoint[] {
+  const byDate = new Map<string, number>();
   for (const t of transactions) {
-    const signed = t.type === "income" ? t.amount : -t.amount;
-    netByDate.set(t.date, (netByDate.get(t.date) ?? 0) + signed);
+    if (t.type !== "expense") continue;
+    byDate.set(t.date, (byDate.get(t.date) ?? 0) + t.amount);
   }
-
-  const dates = [...netByDate.keys()].sort();
-  let running = 0;
-  return dates.map((date) => {
-    running += netByDate.get(date)!;
-    return { date, balance: running };
-  });
+  return [...byDate.entries()]
+    .map(([date, expense]) => ({ date, expense }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export type TimeRange = "1W" | "1M" | "3M" | "YTD" | "1Y" | "All";

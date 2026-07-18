@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatDateWithDay } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
 import { filterDailyTransactions } from "@/lib/aggregations";
+import { Pagination } from "./Pagination";
 import type { DailyTransactionDecrypted } from "@/types";
 
 const TYPE_FILTERS = ["all", "expense", "income"] as const;
+const PAGE_SIZE = 10;
 
 export function DailyTransactionList({
   transactions,
@@ -18,8 +20,13 @@ export function DailyTransactionList({
 }) {
   const [type, setType] = useState<(typeof TYPE_FILTERS)[number]>("all");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  useEffect(() => setPage(1), [month, type, search]);
 
   const filtered = filterDailyTransactions(transactions, { month, type, searchText: search });
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div>
@@ -59,14 +66,14 @@ export function DailyTransactionList({
         </div>
       ) : (
         <ul className="divide-y divide-[#F0F0EE]">
-          {filtered.map((t) => (
+          {paged.map((t) => (
             <li
               key={t.id}
               className="flex items-center justify-between gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <span className="w-10 shrink-0 text-xs tabular-nums text-[#8A8C8E]">
-                  {t.date.slice(5)}
+                <span className="w-28 shrink-0 text-xs text-[#8A8C8E]">
+                  {formatDateWithDay(t.date)}
                 </span>
                 {t.pending ? (
                   <span className="shrink-0 rounded-full border border-dashed border-[#B8862B] px-2 py-0.5 text-xs text-[#B8862B]">
@@ -94,6 +101,8 @@ export function DailyTransactionList({
           ))}
         </ul>
       )}
+
+      <Pagination page={page} totalPages={totalPages} onChange={setPage} />
     </div>
   );
 }

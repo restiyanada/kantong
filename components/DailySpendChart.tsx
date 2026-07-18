@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
@@ -10,9 +10,9 @@ import {
   CartesianGrid,
 } from "recharts";
 import { formatIDR } from "@/lib/format";
-import type { RunningBalancePoint } from "@/lib/aggregations";
+import type { DailySpendPoint } from "@/lib/aggregations";
 
-export function BalanceChart({ points }: { points: RunningBalancePoint[] }) {
+export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
   if (points.length === 0) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-1 text-center">
@@ -25,13 +25,7 @@ export function BalanceChart({ points }: { points: RunningBalancePoint[] }) {
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <defs>
-            <linearGradient id="balanceFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1E7A5F" stopOpacity={0.22} />
-              <stop offset="100%" stopColor="#1E7A5F" stopOpacity={0} />
-            </linearGradient>
-          </defs>
+        <BarChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke="#EFEFEC" vertical={false} />
           <XAxis
             dataKey="date"
@@ -55,15 +49,8 @@ export function BalanceChart({ points }: { points: RunningBalancePoint[] }) {
               fontSize: 12,
             }}
           />
-          <Area
-            type="monotone"
-            dataKey="balance"
-            stroke="#1E7A5F"
-            strokeWidth={2.25}
-            fill="url(#balanceFill)"
-            animationDuration={400}
-          />
-        </AreaChart>
+          <Bar dataKey="expense" fill="#B23B3B" radius={[3, 3, 0, 0]} animationDuration={400} />
+        </BarChart>
       </ResponsiveContainer>
     </div>
   );
