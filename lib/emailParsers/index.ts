@@ -23,7 +23,7 @@ export function parseSourceEmail(
   if (sender.includes("klikbca.com")) return parseBCACreditCard(body);
   if (sender.includes("bca.co.id")) return parseBCA(body);
   if (sender.includes("danamon.co.id")) return parseDanamon(subject, body);
-  if (sender.includes("dbs.com")) return parseDBS(body);
+  if (sender.includes("dbs.com")) return parseDBS(subject, body);
   if (sender.includes("grab.com")) return parseGrab(subject, body);
 
   return null;
