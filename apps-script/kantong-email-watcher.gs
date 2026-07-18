@@ -99,6 +99,11 @@ function processThread(thread, apiUrl, apiSecret) {
       messageId: message.getId(),
     };
 
+    // TEMPORARY DEBUG — remove once the DBS QRIS parsing issue is fixed.
+    if (payload.subject.includes("QRIS")) {
+      Logger.log(`RAW BODY (${payload.messageId}):\n${payload.body}`);
+    }
+
     try {
       const response = UrlFetchApp.fetch(apiUrl, {
         method: "post",
