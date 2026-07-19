@@ -1,6 +1,7 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseDashedDMYDate, parseIndonesianAbbrevDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
+import { getOwnAccountAliases } from "./ownAccountConfig";
 import type { ParseResult } from "./types";
 
 /**
@@ -18,13 +19,13 @@ import type { ParseResult } from "./types";
  *          user's OWN DBS account ("kamu" = "you") — always skipped
  *       "digibank – Transfer Ke Rekening Bank Lain Berhasil"
  *                                                      -> transfer to a
- *          DIFFERENT (non-DBS) bank account — no recipient name is ever
- *          given, just a masked account suffix, so unlike BCA we can't
- *          check for a self-transfer by name. The subject line itself is
- *          the only reliable signal DBS gives us, and it already
- *          distinguishes "your account" from "another account" for us.
- *          Logged as an expense (money genuinely left the user's DBS
- *          account to a different bank).
+ *          DIFFERENT (non-DBS) bank account. No recipient name is given,
+ *          but DBS does show a saved nickname for the destination account
+ *          (e.g. "ke bca uwi ... nomor rekening berakhiran 6068"). If that
+ *          nickname matches one of the user's own account aliases, it's a
+ *          self-transfer and should be skipped, same as BCA/Danamon.
+ *          Otherwise it's logged as a real expense (money genuinely left
+ *          the user's DBS account to someone else's account).
  */
 export function parseDBS(subject: string, body: string): ParseResult {
   const sentenceResult = parseOldSentenceFormat(body);
@@ -97,6 +98,17 @@ function parseDigibankQRIS(body: string): ParseResult {
 }
 
 function parseTransferToOtherBank(body: string): ParseResult {
+  // The destination nickname sits between "ke" and "dengan nomor rekening",
+  // e.g. "ke bca uwi dengan nomor rekening berakhiran 6068" -> "bca uwi".
+  // If it matches one of the user's own account aliases, this is money
+  // moving between the user's own accounts, not real spending.
+  const destNameMatch = /ke\s+([a-z\s]+?)\s+dengan\s+nomor\s+rekening/i.exec(body);
+  const destName = destNameMatch?.[1]?.trim().toLowerCase();
+  const ownAliases = getOwnAccountAliases();
+  if (destName && ownAliases.some((alias) => destName.includes(alias))) {
+    return { skip: true, reason: "self-transfer, not an expense" };
+  }
+
   const amountMatch = /transfer sebesar Rp\s*([\d.,]+)/i.exec(body);
   const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
   if (!amount) return null;
@@ -105,10 +117,10 @@ function parseTransferToOtherBank(body: string): ParseResult {
   const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
   if (!date) return null;
 
-  // No recipient name is ever given — just a masked destination account
-  // suffix, e.g. "ke ******4742". That's all we can put in the note.
+  // Masked destination account suffix, used as a fallback note when there's
+  // no recognizable nickname (e.g. a transfer to someone else's account).
   const destMatch = /ke\s+\**(\d{3,})/i.exec(body);
-  const note = destMatch ? `DBS transfer to ****${destMatch[1]}` : "DBS transfer";
+  const note = destName ? `Transfer to ${destName}` : destMatch ? `DBS transfer to ****${destMatch[1]}` : "DBS transfer";
 
   return {
     amount,

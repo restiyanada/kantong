@@ -1,6 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { parseDBS } from "../dbs";
 import { isSkip } from "../types";
+
+beforeEach(() => {
+  process.env.OWN_ACCOUNT_ALIASES = "uwi";
+});
+
+afterEach(() => {
+  delete process.env.OWN_ACCOUNT_ALIASES;
+});
 
 const SUBJECT_OLD = "DBS - Informasi Transaksi Anda";
 const OLD_SENTENCE_BODY = `
@@ -87,6 +95,17 @@ describe("parseDBS", () => {
     expect(result.note).toBe("DBS transfer to ****4742");
     expect(result.category).toBe("Other");
     expect(result.pending).toBe(true);
+  });
+
+  it("skips a DBS-to-other-bank transfer when the destination nickname is the user's own account (real bug: Bca_uwi.pdf)", () => {
+    const realBody = `
+Hai RESTIYANA DWI ASTUTI,
+
+Kamu telah berhasil melakukan transfer sebesar Rp 1000000 dari rekening berakhiran 6653 ke bca uwi dengan
+nomor rekening berakhiran 6068 pada 10-Jul-2026.
+`;
+    const result = parseDBS(SUBJECT_OTHER_BANK, realBody);
+    expect(isSkip(result)).toBe(true);
   });
 
   it("returns null for unrecognized body/subject shapes", () => {

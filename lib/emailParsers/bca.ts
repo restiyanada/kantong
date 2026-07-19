@@ -1,11 +1,8 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseIndonesianAbbrevDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
+import { getOwnNamePattern } from "./ownAccountConfig";
 import type { ParseResult } from "./types";
-
-// Used to detect a transfer to the user's own name/accounts, which should
-// never be logged as an expense (money isn't actually leaving the user).
-const OWN_NAME_PATTERN = /restiyana/i;
 
 /**
  * Parses a BCA "Internet Transaction Journal" email (myBCA). BCA sends (at
@@ -104,7 +101,8 @@ function parseAccountTransfer(
   const recipient = recipientMatch ? recipientMatch[1].trim() : null;
 
   if (!recipient) return null;
-  if (OWN_NAME_PATTERN.test(recipient)) {
+  const ownNamePattern = getOwnNamePattern();
+  if (ownNamePattern && ownNamePattern.test(recipient)) {
     return { skip: true, reason: "self-transfer, not an expense" };
   }
 

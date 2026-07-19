@@ -1,6 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { parseBCA } from "../bca";
 import { isSkip } from "../types";
+
+beforeEach(() => {
+  process.env.OWN_NAME = "restiyana";
+});
+
+afterEach(() => {
+  delete process.env.OWN_NAME;
+});
 
 const QRIS_BODY_JULY = `
 Status : Berhasil
