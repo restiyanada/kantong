@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { formatIDR, formatDateWithDay } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
-import { filterDailyTransactions } from "@/lib/aggregations";
+import {
+  filterDailyTransactions,
+  groupTransactionsByDay,
+  paginateDayGroups,
+} from "@/lib/aggregations";
 import { Pagination } from "./Pagination";
 import type { DailyTransactionDecrypted } from "@/types";
 
 const TYPE_FILTERS = ["all", "expense", "income"] as const;
-const PAGE_SIZE = 10;
+const DAYS_PER_PAGE = 3;
 
 export function DailyTransactionList({
   transactions,
@@ -25,8 +29,9 @@ export function DailyTransactionList({
   useEffect(() => setPage(1), [month, type, search]);
 
   const filtered = filterDailyTransactions(transactions, { month, type, searchText: search });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const groups = groupTransactionsByDay(filtered);
+  const totalPages = Math.max(1, Math.ceil(groups.length / DAYS_PER_PAGE));
+  const pagedGroups = paginateDayGroups(groups, page, DAYS_PER_PAGE);
 
   return (
     <div>
@@ -65,41 +70,52 @@ export function DailyTransactionList({
           <p className="text-xs text-[#ADAFAF]">Try a different filter or search term.</p>
         </div>
       ) : (
-        <ul className="divide-y divide-[#F0F0EE]">
-          {paged.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center justify-between gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="w-28 shrink-0 text-xs text-[#8A8C8E]">
-                  {formatDateWithDay(t.date)}
-                </span>
-                {t.pending ? (
-                  <span className="shrink-0 rounded-full border border-dashed border-[#B8862B] px-2 py-0.5 text-xs text-[#B8862B]">
-                    Pending
-                  </span>
-                ) : (
-                  <span
-                    className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                    style={{ backgroundColor: categoryColor(t.category) }}
+        <div>
+          {pagedGroups.map((group) => (
+            <div key={group.date}>
+              <p className="pt-4 pb-1.5 text-xs font-semibold uppercase tracking-wide text-[#ADAFAF] first:pt-0">
+                {formatDateWithDay(group.date)}
+              </p>
+              <ul className="divide-y divide-[#F0F0EE]">
+                {group.transactions.map((t) => (
+                  <li
+                    key={t.id}
+                    className="flex items-start gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
                   >
-                    {t.category}
-                  </span>
-                )}
-                <span className="truncate text-sm text-[#1A1B1E]">{t.note || "—"}</span>
-              </div>
-              <span
-                className={`shrink-0 tabular-nums text-sm font-semibold ${
-                  t.type === "income" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
-                }`}
-              >
-                {t.type === "income" ? "+" : "-"}
-                {formatIDR(t.amount)}
-              </span>
-            </li>
+                    <span
+                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                        t.pending ? "border-2 border-[#B8862B] bg-white" : ""
+                      }`}
+                      style={t.pending ? undefined : { backgroundColor: categoryColor(t.category) }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-sm font-medium text-[#1A1B1E]">
+                          {t.note || "—"}
+                        </span>
+                        <span
+                          className={`shrink-0 tabular-nums text-sm font-semibold ${
+                            t.type === "income" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
+                          }`}
+                        >
+                          {t.type === "income" ? "+" : "-"}
+                          {formatIDR(t.amount)}
+                        </span>
+                      </div>
+                      <p
+                        className={`mt-0.5 text-xs ${
+                          t.pending ? "font-medium text-[#B8862B]" : "text-[#8A8C8E]"
+                        }`}
+                      >
+                        {t.pending ? "Needs a category" : t.category}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       <Pagination page={page} totalPages={totalPages} onChange={setPage} />

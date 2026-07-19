@@ -5,6 +5,8 @@ import {
   computeCategoryBreakdown,
   computeMonthlyTotals,
   filterDailyTransactions,
+  groupTransactionsByDay,
+  paginateDayGroups,
   computeSavingsBalance,
   computeDepositoTotal,
   depositoBadge,
@@ -130,6 +132,66 @@ describe("filterDailyTransactions", () => {
 
   it("sorts by date descending", () => {
     expect(filterDailyTransactions(txns, {}).map((t) => t.id)).toEqual(["b", "a", "c"]);
+  });
+});
+
+describe("groupTransactionsByDay", () => {
+  it("buckets consecutive same-date transactions, preserving order", () => {
+    const txns = [
+      daily({ id: "a", date: "2026-07-18" }),
+      daily({ id: "b", date: "2026-07-18" }),
+      daily({ id: "c", date: "2026-07-17" }),
+      daily({ id: "d", date: "2026-07-16" }),
+    ];
+    const groups = groupTransactionsByDay(txns);
+    expect(groups.map((g) => g.date)).toEqual(["2026-07-18", "2026-07-17", "2026-07-16"]);
+    expect(groups[0].transactions.map((t) => t.id)).toEqual(["a", "b"]);
+  });
+
+  it("does not merge non-consecutive same-date transactions", () => {
+    const txns = [
+      daily({ id: "a", date: "2026-07-18" }),
+      daily({ id: "b", date: "2026-07-17" }),
+      daily({ id: "c", date: "2026-07-18" }),
+    ];
+    expect(groupTransactionsByDay(txns).map((g) => g.date)).toEqual([
+      "2026-07-18",
+      "2026-07-17",
+      "2026-07-18",
+    ]);
+  });
+
+  it("returns an empty array for no transactions", () => {
+    expect(groupTransactionsByDay([])).toEqual([]);
+  });
+});
+
+describe("paginateDayGroups", () => {
+  const groups = [
+    { date: "2026-07-18", transactions: [] },
+    { date: "2026-07-17", transactions: [] },
+    { date: "2026-07-16", transactions: [] },
+    { date: "2026-07-15", transactions: [] },
+    { date: "2026-07-14", transactions: [] },
+  ];
+
+  it("returns a page of complete day groups", () => {
+    expect(paginateDayGroups(groups, 1, 3).map((g) => g.date)).toEqual([
+      "2026-07-18",
+      "2026-07-17",
+      "2026-07-16",
+    ]);
+  });
+
+  it("returns the remainder on the last page", () => {
+    expect(paginateDayGroups(groups, 2, 3).map((g) => g.date)).toEqual([
+      "2026-07-15",
+      "2026-07-14",
+    ]);
+  });
+
+  it("returns an empty array past the last page", () => {
+    expect(paginateDayGroups(groups, 3, 3)).toEqual([]);
   });
 });
 

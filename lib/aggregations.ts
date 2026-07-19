@@ -117,6 +117,40 @@ export function filterDailyTransactions(
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }
 
+export interface DayGroup {
+  date: string;
+  transactions: DailyTransactionDecrypted[];
+}
+
+/**
+ * Buckets already-sorted transactions into consecutive same-date groups,
+ * preserving the incoming order within and across groups.
+ */
+export function groupTransactionsByDay(
+  transactions: DailyTransactionDecrypted[]
+): DayGroup[] {
+  const groups: DayGroup[] = [];
+  for (const t of transactions) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === t.date) {
+      last.transactions.push(t);
+    } else {
+      groups.push({ date: t.date, transactions: [t] });
+    }
+  }
+  return groups;
+}
+
+/** Slices day groups into a page of `groupsPerPage` complete days (1-indexed page). */
+export function paginateDayGroups(
+  groups: DayGroup[],
+  page: number,
+  groupsPerPage: number
+): DayGroup[] {
+  const start = (page - 1) * groupsPerPage;
+  return groups.slice(start, start + groupsPerPage);
+}
+
 // ---- Savings ---------------------------------------------------------------
 
 /** All-time Savings balance. */
