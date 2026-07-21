@@ -37,11 +37,13 @@ export function AllView({
   savings,
   deposito,
   todayISO,
+  onSelectDeposito,
 }: {
   daily: DailyTransactionDecrypted[];
   savings: SavingsTransactionDecrypted[];
   deposito: DepositoCertificateDecrypted[];
   todayISO: string;
+  onSelectDeposito: () => void;
 }) {
   const [range, setRange] = useState<TimeRange>("3M");
 
@@ -92,6 +94,7 @@ export function AllView({
               value: values[p.key],
               color: p.color,
               icon: p.icon,
+              onClick: p.key === "deposito" ? onSelectDeposito : undefined,
             }))}
           />
         </div>

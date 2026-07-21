@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { ChevronRight } from "lucide-react";
 import { formatIDR } from "@/lib/format";
 
 export interface AllocationItem {
@@ -6,6 +7,7 @@ export interface AllocationItem {
   value: number;
   color: string;
   icon?: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  onClick?: () => void;
 }
 
 export function AllocationList({ items }: { items: AllocationItem[] }) {
@@ -22,8 +24,15 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
         const Icon = item.icon;
         const pct = total > 0 ? (Math.max(item.value, 0) / total) * 100 : 0;
         const barWidthPct = (Math.abs(item.value) / max) * 100;
+        const Wrapper = item.onClick ? "button" : "div";
         return (
-          <div key={item.label}>
+          <Wrapper
+            key={item.label}
+            {...(item.onClick ? { onClick: item.onClick, type: "button" } : {})}
+            className={`block w-full text-left ${
+              item.onClick ? "cursor-pointer rounded-lg -mx-2 px-2 py-1 transition-colors duration-150 hover:bg-[#FAFAF9]" : ""
+            }`}
+          >
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2.5">
                 {Icon ? (
@@ -44,9 +53,12 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
                   {formatIDR(item.value)}
                 </span>
               </div>
-              <span className="shrink-0 tabular-nums text-sm font-semibold text-[#1A1B1E]">
-                {pct.toFixed(2)}%
-              </span>
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="tabular-nums text-sm font-semibold text-[#1A1B1E]">
+                  {pct.toFixed(2)}%
+                </span>
+                {item.onClick && <ChevronRight size={15} className="text-[#ADAFAF]" />}
+              </div>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[#F0F0EE]">
               <div
@@ -57,7 +69,7 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
                 }}
               />
             </div>
-          </div>
+          </Wrapper>
         );
       })}
     </div>

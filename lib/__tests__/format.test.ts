@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatIDR, formatShortDate, formatDateWithDay } from "../format";
+import { formatIDR, formatShortDate, formatMediumDate, formatDateWithDay } from "../format";
 
 describe("formatIDR", () => {
   it("formats as Rp with thousand separators", () => {
@@ -10,6 +10,12 @@ describe("formatIDR", () => {
 describe("formatShortDate", () => {
   it("formats as '17 Jan' (no year, no weekday)", () => {
     expect(formatShortDate("2026-01-17")).toBe("17 Jan");
+  });
+});
+
+describe("formatMediumDate", () => {
+  it("formats as '17 Jan 2026' (no weekday)", () => {
+    expect(formatMediumDate("2026-01-17")).toBe("17 Jan 2026");
   });
 });
 

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { SavingsTransactionDecrypted } from "@/types";
 import { computeSavingsBalance, computeGoalBreakdown } from "@/lib/aggregations";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatDateWithDay } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
@@ -63,8 +63,8 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
                 className="flex flex-col gap-2 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:flex-row sm:items-center sm:justify-between sm:px-2 sm:rounded-lg"
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="w-20 shrink-0 text-xs tabular-nums text-[#8A8C8E]">
-                    {t.date}
+                  <span className="w-28 shrink-0 text-xs text-[#8A8C8E]">
+                    {formatDateWithDay(t.date)}
                   </span>
                   <span
                     className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"

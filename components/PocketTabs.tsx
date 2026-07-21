@@ -1,13 +1,12 @@
 "use client";
 
-import { Wallet, PiggyBank, Landmark, LayoutGrid } from "lucide-react";
+import { Wallet, PiggyBank, LayoutGrid } from "lucide-react";
 import type { ComponentType } from "react";
 
 const TABS: { key: PocketKey; label: string; icon: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
   { key: "all", label: "All", icon: LayoutGrid },
   { key: "daily", label: "Daily", icon: Wallet },
   { key: "savings", label: "Savings", icon: PiggyBank },
-  { key: "deposito", label: "Deposito", icon: Landmark },
 ];
 
 export type PocketKey = "all" | "daily" | "savings" | "deposito";

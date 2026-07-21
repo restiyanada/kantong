@@ -42,11 +42,23 @@ export function DashboardShell({
 
       <div key={tab} className="animate-fade-in-up">
         {tab === "all" && (
-          <AllView daily={daily} savings={savings} deposito={deposito} todayISO={todayISO} />
+          <AllView
+            daily={daily}
+            savings={savings}
+            deposito={deposito}
+            todayISO={todayISO}
+            onSelectDeposito={() => setTab("deposito")}
+          />
         )}
         {tab === "daily" && <DailyView transactions={daily} todayISO={todayISO} />}
         {tab === "savings" && <SavingsView transactions={savings} />}
-        {tab === "deposito" && <DepositoView certificates={deposito} todayISO={todayISO} />}
+        {tab === "deposito" && (
+          <DepositoView
+            certificates={deposito}
+            todayISO={todayISO}
+            onBack={() => setTab("all")}
+          />
+        )}
       </div>
     </div>
   );

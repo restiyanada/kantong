@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatShortDate } from "@/lib/format";
 import type { NetWorthPoint } from "@/lib/aggregations";
 
 export interface NetWorthSeriesConfig {
@@ -56,6 +56,7 @@ export function NetWorthChart({
           <CartesianGrid stroke="#EFEFEC" vertical={false} />
           <XAxis
             dataKey="date"
+            tickFormatter={formatShortDate}
             tick={{ fontSize: 11, fill: "#8A8C8E" }}
             tickLine={false}
             axisLine={{ stroke: "#EAEAE6" }}
@@ -72,6 +73,7 @@ export function NetWorthChart({
               formatIDR(Number(value)),
               series.find((s) => s.key === name)?.label ?? name,
             ]}
+            labelFormatter={(label) => formatShortDate(String(label))}
             contentStyle={{
               borderRadius: 10,
               border: "1px solid #EAEAE6",

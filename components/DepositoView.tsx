@@ -1,18 +1,21 @@
 "use client";
 
 import { useMemo } from "react";
+import { ArrowLeft } from "lucide-react";
 import type { DepositoCertificateDecrypted } from "@/types";
 import { computeDepositoTotal, depositoBadge } from "@/lib/aggregations";
-import { formatIDR } from "@/lib/format";
+import { formatIDR, formatMediumDate } from "@/lib/format";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 
 export function DepositoView({
   certificates,
   todayISO,
+  onBack,
 }: {
   certificates: DepositoCertificateDecrypted[];
   todayISO: string;
+  onBack: () => void;
 }) {
   const total = useMemo(() => computeDepositoTotal(certificates), [certificates]);
   const sorted = useMemo(
@@ -22,6 +25,14 @@ export function DepositoView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-sm font-medium text-[#6B6D70] transition-colors duration-150 hover:text-[#1A1B1E]"
+      >
+        <ArrowLeft size={15} />
+        Back to All
+      </button>
+
       <BalanceCard label="Total deposito value" balance={total} />
 
       <Panel>
@@ -45,7 +56,7 @@ export function DepositoView({
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[#1A1B1E]">{c.bank}</p>
                     <p className="truncate text-xs text-[#8A8C8E]">
-                      Opened {c.openedDate} · Matures {c.maturityDate}
+                      Opened {formatMediumDate(c.openedDate)} · Matures {formatMediumDate(c.maturityDate)}
                     </p>
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
