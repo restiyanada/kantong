@@ -9,12 +9,18 @@ import type { ParseResult } from "./types";
  * least) two shapes, distinguishable by which field is present:
  *
  *  1. "Jenis Transaksi" field — QRIS/card payments and BCA Virtual Account
- *     transfers (e.g. e-wallet top-ups):
+ *     transfers (e.g. e-wallet top-ups, or merchants/billers that happen to
+ *     be paid through BCA's VA rails):
  *       Jenis Transaksi : Pembayaran QRIS         -> log as expense
  *       Jenis Transaksi : Transfer ke BCA Virtual Account
- *                                                   -> always skipped (the
- *          user tops up e-wallets like ShopeePay and logs real purchases
- *          from them manually, so the top-up itself shouldn't double-count)
+ *          -> skipped ONLY if "Nama Perusahaan/Produk" matches a known
+ *          e-wallet (ShopeePay, GoPay, OVO, DANA, LinkAja — see
+ *          EWALLET_PRODUCT_KEYWORDS below), since the user tops those up
+ *          and logs the real purchases from them manually, so the top-up
+ *          itself shouldn't double-count. Any other VA transfer (e.g. a
+ *          travel operator or biller paid directly via VA) is a real
+ *          expense and is logged normally, using the product/company name
+ *          as the merchant for categorization.
  *
  *  2. "Jenis Transfer" field — a direct BCA-to-BCA account transfer:
  *       Jenis Transfer : Transfer ke rekening BCA
@@ -50,12 +56,27 @@ export function parseBCA(body: string): ParseResult {
   return null; // neither known field present — genuinely unrecognized shape
 }
 
+// Product/company names (from "Nama Perusahaan/Produk") that indicate the
+// VA transfer is an e-wallet top-up rather than a real merchant/biller
+// payment. Case-insensitive partial match, same convention as merchantMap.ts.
+const EWALLET_PRODUCT_KEYWORDS = ["SHOPEEPAY", "GOPAY", "OVO", "DANA", "LINKAJA"];
+
+function isEwalletTopup(product: string): boolean {
+  const upper = product.toUpperCase();
+  return EWALLET_PRODUCT_KEYWORDS.some((keyword) => upper.includes(keyword));
+}
+
 function parsePembayaranOrVA(
   body: string,
   jenis: string,
   referenceId: string | undefined
 ): ParseResult {
-  if (/transfer ke bca virtual account/i.test(jenis)) {
+  const isVATransfer = /transfer ke bca virtual account/i.test(jenis);
+
+  const productMatch = /Nama Perusahaan\/Produk\s*:\s*(.+)/.exec(body);
+  const product = productMatch ? productMatch[1].trim() : "";
+
+  if (isVATransfer && isEwalletTopup(product)) {
     return { skip: true, reason: "e-wallet top-up, logged manually by user" };
   }
   if (/kartu kredit.*paylater/i.test(jenis)) {
@@ -66,7 +87,7 @@ function parsePembayaranOrVA(
     // every purchase that made up the bill.
     return { skip: true, reason: "credit card bill payment, not new spending" };
   }
-  if (!/pembayaran/i.test(jenis)) {
+  if (!isVATransfer && !/pembayaran/i.test(jenis)) {
     return { skip: true, reason: "not a payment transaction" };
   }
 
@@ -78,8 +99,10 @@ function parsePembayaranOrVA(
   const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
   if (!date) return null;
 
+  // Most payments have "Pembayaran Ke"; VA transfers that fall through here
+  // (not an e-wallet top-up) instead only have "Nama Perusahaan/Produk".
   const merchantMatch = /Pembayaran Ke\s*:\s*(.+)/.exec(body);
-  const merchant = merchantMatch ? merchantMatch[1].trim() : "BCA";
+  const merchant = merchantMatch ? merchantMatch[1].trim() : product || "BCA";
 
   const category = categorizeMerchant(merchant);
 

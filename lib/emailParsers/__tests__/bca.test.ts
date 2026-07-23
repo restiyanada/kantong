@@ -39,6 +39,19 @@ Total Bayar : IDR 300,000.00
 Nomor Referensi : 19D209DC-A016-4F47-A69C-CE21122A50AF
 `;
 
+// Real sample: a shuttle-ticket purchase (Cititrans) routed through BCA's
+// VA rails. Same "Jenis Transaksi : Transfer ke BCA Virtual Account" shape
+// as the ShopeePay top-up above, but the product name isn't a known
+// e-wallet, so this should be logged as a real expense, not skipped.
+const VA_MERCHANT_BODY = `
+Status : Berhasil
+Tanggal Transaksi : 21 Jul 2026 19:13:38
+Jenis Transaksi : Transfer ke BCA Virtual Account
+Nama Perusahaan/Produk : PT TRANS ANTAR NUSABIRD / CITITRANS
+Total Bayar : IDR 360,000.00
+Nomor Referensi : 4EBE3DBC-E5C0-4F76-81D7-00931CACE596
+`;
+
 const TRANSFER_TO_FRIEND_BODY = `
 Status : Berhasil
 Tanggal Transaksi : 20 Mei 2026 12:38:46
@@ -90,6 +103,16 @@ describe("parseBCA", () => {
   it("skips a BCA Virtual Account top-up (e.g. ShopeePay) — logged manually by user", () => {
     const result = parseBCA(VA_TOPUP_BODY);
     expect(isSkip(result)).toBe(true);
+  });
+
+  it("logs a non-e-wallet VA transfer (merchant paid via VA) as an expense", () => {
+    const result = parseBCA(VA_MERCHANT_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(360000);
+    expect(result.date).toBe("2026-07-21");
+    expect(result.note).toBe("PT TRANS ANTAR NUSABIRD / CITITRANS");
+    expect(result.category).toBe("Other"); // Cititrans isn't a mapped keyword
+    expect(result.pending).toBe(true);
   });
 
   it("logs a transfer to another person as an expense", () => {
