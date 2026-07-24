@@ -6,6 +6,9 @@ export interface TelegramMessage {
   message_id: number;
   chat: TelegramChat;
   text?: string;
+  /** Present when this message is a reply to another — used to tell a
+   * free-text note reply apart from a new transaction to log. */
+  reply_to_message?: TelegramMessage;
 }
 
 export interface TelegramCallbackQuery {
@@ -28,3 +31,8 @@ export interface InlineKeyboardButton {
 export type InlineKeyboardMarkup = {
   inline_keyboard: InlineKeyboardButton[][];
 };
+
+/** Prompts the user's Telegram client to reply directly to this message. */
+export interface ForceReply {
+  force_reply: true;
+}

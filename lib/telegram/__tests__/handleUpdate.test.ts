@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../../db/dailyTransactions", () => ({
   createDailyTransaction: vi.fn(async () => "daily-doc-1"),
   resolveDailyCategory: vi.fn(async () => undefined),
+  updateDailyTransactionNote: vi.fn(async () => undefined),
 }));
 vi.mock("../../db/savingsTransactions", () => ({
   createSavingsTransaction: vi.fn(async () => "savings-doc-1"),
@@ -21,7 +22,7 @@ vi.mock("../telegramApi", () => ({
 }));
 
 import { handleUpdate } from "../handleUpdate";
-import { createDailyTransaction, resolveDailyCategory } from "../../db/dailyTransactions";
+import { createDailyTransaction, resolveDailyCategory, updateDailyTransactionNote } from "../../db/dailyTransactions";
 import { createSavingsTransaction } from "../../db/savingsTransactions";
 import {
   createCertificate,
@@ -53,6 +54,32 @@ describe("handleUpdate — Daily", () => {
     expect(sendMessage).toHaveBeenCalledWith(CHAT_ID, expect.stringContaining("Food"));
   });
 
+  it("prompts for a note (force-reply) when a recognized-category entry has none", async () => {
+    await handleUpdate(message("25000 food"));
+
+    expect(createDailyTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "Food", pending: false, note: "" })
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      CHAT_ID,
+      expect.stringContaining("ref:daily-doc-1"),
+      { force_reply: true }
+    );
+  });
+
+  it("logs a no-note income entry and prompts for a note the same way", async () => {
+    await handleUpdate(message("+5000000 salary"));
+
+    expect(createDailyTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "income", category: "Salary", note: "" })
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      CHAT_ID,
+      expect.stringContaining("ref:daily-doc-1"),
+      { force_reply: true }
+    );
+  });
+
   it("creates a pending entry and sends category buttons for an unmatched category", async () => {
     await handleUpdate(message("25000 xyz something"));
 
@@ -65,6 +92,52 @@ describe("handleUpdate — Daily", () => {
       CHAT_ID,
       expect.stringContaining("Which category?"),
       expect.objectContaining({ inline_keyboard: expect.any(Array) })
+    );
+  });
+});
+
+describe("handleUpdate — note prompt reply", () => {
+  it("saves the note when replying to the 'add a note?' prompt", async () => {
+    await handleUpdate({
+      update_id: 10,
+      message: {
+        message_id: 50,
+        chat: { id: CHAT_ID },
+        text: "nasi goreng deket kantor",
+        reply_to_message: {
+          message_id: 49,
+          chat: { id: CHAT_ID },
+          text: "✅ -Rp25,000 — Food\n✏️ Add a note? Reply to this message. (ref:daily-doc-1)",
+        },
+      },
+    });
+
+    expect(updateDailyTransactionNote).toHaveBeenCalledWith(
+      "daily-doc-1",
+      "nasi goreng deket kantor"
+    );
+    expect(createDailyTransaction).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(CHAT_ID, expect.stringContaining("Note saved"));
+  });
+
+  it("falls through to normal parsing when the reply isn't a note prompt", async () => {
+    await handleUpdate({
+      update_id: 11,
+      message: {
+        message_id: 51,
+        chat: { id: CHAT_ID },
+        text: "25000 food nasi goreng",
+        reply_to_message: {
+          message_id: 50,
+          chat: { id: CHAT_ID },
+          text: "just some other message",
+        },
+      },
+    });
+
+    expect(updateDailyTransactionNote).not.toHaveBeenCalled();
+    expect(createDailyTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "Food" })
     );
   });
 });

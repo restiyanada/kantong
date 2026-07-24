@@ -3,14 +3,16 @@
 import { useMemo } from "react";
 import type { SavingsTransactionDecrypted } from "@/types";
 import { computeSavingsBalance, computeGoalBreakdown } from "@/lib/aggregations";
-import { formatIDR, formatDateWithDay } from "@/lib/format";
+import { displayIDR, formatDateWithDay } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 import { DonutChart } from "./DonutChart";
 import { AllocationList } from "./AllocationList";
 
 export function SavingsView({ transactions }: { transactions: SavingsTransactionDecrypted[] }) {
+  const { hidden } = useBalanceVisibility();
   const balance = useMemo(() => computeSavingsBalance(transactions), [transactions]);
   const goalBreakdown = useMemo(() => computeGoalBreakdown(transactions), [transactions]);
   const sorted = useMemo(
@@ -32,7 +34,7 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
               color: categoryColor(g.goal),
             }))}
             centerLabel="Savings"
-            centerValue={formatIDR(balance)}
+            centerValue={displayIDR(balance, hidden)}
           />
           <div className="mt-6">
             <AllocationList
@@ -80,7 +82,7 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
                   }`}
                 >
                   {t.direction === "in" ? "+" : "-"}
-                  {formatIDR(t.amount)}
+                  {displayIDR(t.amount, hidden)}
                 </span>
               </li>
             ))}

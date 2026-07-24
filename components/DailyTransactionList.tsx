@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
-import { formatIDR, formatDateWithDay } from "@/lib/format";
+import { displayIDR, formatDateWithDay } from "@/lib/format";
 import { categoryColor } from "@/lib/categoryColors";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import {
   filterDailyTransactions,
   groupTransactionsByDay,
@@ -25,6 +26,7 @@ export function DailyTransactionList({
   const [type, setType] = useState<(typeof TYPE_FILTERS)[number]>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const { hidden } = useBalanceVisibility();
 
   useEffect(() => setPage(1), [month, type, search]);
 
@@ -99,7 +101,7 @@ export function DailyTransactionList({
                           }`}
                         >
                           {t.type === "income" ? "+" : "-"}
-                          {formatIDR(t.amount)}
+                          {displayIDR(t.amount, hidden)}
                         </span>
                       </div>
                       <p

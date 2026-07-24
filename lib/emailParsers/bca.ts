@@ -1,6 +1,7 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseIndonesianAbbrevDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
+import { decodeHtmlEntities } from "./decodeEntities";
 import { getOwnNamePattern } from "./ownAccountConfig";
 import type { ParseResult } from "./types";
 
@@ -74,7 +75,7 @@ function parsePembayaranOrVA(
   const isVATransfer = /transfer ke bca virtual account/i.test(jenis);
 
   const productMatch = /Nama Perusahaan\/Produk\s*:\s*(.+)/.exec(body);
-  const product = productMatch ? productMatch[1].trim() : "";
+  const product = productMatch ? decodeHtmlEntities(productMatch[1].trim()) : "";
 
   if (isVATransfer && isEwalletTopup(product)) {
     return { skip: true, reason: "e-wallet top-up, logged manually by user" };
@@ -102,7 +103,7 @@ function parsePembayaranOrVA(
   // Most payments have "Pembayaran Ke"; VA transfers that fall through here
   // (not an e-wallet top-up) instead only have "Nama Perusahaan/Produk".
   const merchantMatch = /Pembayaran Ke\s*:\s*(.+)/.exec(body);
-  const merchant = merchantMatch ? merchantMatch[1].trim() : product || "BCA";
+  const merchant = merchantMatch ? decodeHtmlEntities(merchantMatch[1].trim()) : product || "BCA";
 
   const category = categorizeMerchant(merchant);
 
@@ -121,7 +122,7 @@ function parseAccountTransfer(
   referenceId: string | undefined
 ): ParseResult {
   const recipientMatch = /Nama Penerima\s*:\s*(.+)/.exec(body);
-  const recipient = recipientMatch ? recipientMatch[1].trim() : null;
+  const recipient = recipientMatch ? decodeHtmlEntities(recipientMatch[1].trim()) : null;
 
   if (!recipient) return null;
   const ownNamePattern = getOwnNamePattern();

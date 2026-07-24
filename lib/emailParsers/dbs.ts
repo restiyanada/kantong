@@ -1,6 +1,7 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseDashedDMYDate, parseIndonesianAbbrevDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
+import { decodeHtmlEntities } from "./decodeEntities";
 import { getOwnAccountAliases } from "./ownAccountConfig";
 import type { ParseResult } from "./types";
 
@@ -59,7 +60,7 @@ function parseOldSentenceFormat(body: string): ParseResult {
   const date = parseDashedDMYDate(dateRaw);
   if (!date) return null;
 
-  const merchant = merchantRaw.trim();
+  const merchant = decodeHtmlEntities(merchantRaw.trim());
   const category = categorizeMerchant(merchant);
 
   return {
@@ -81,7 +82,7 @@ function parseDigibankQRIS(body: string): ParseResult {
   if (!date) return null;
 
   const merchantMatch = /Nama Merchant:\s*(.+?)(?:\s{2,}\d+\.|$)/.exec(body);
-  const merchant = merchantMatch ? merchantMatch[1].trim() : "DBS";
+  const merchant = decodeHtmlEntities(merchantMatch ? merchantMatch[1].trim() : "DBS");
 
   const referenceMatch = /Reff ID:\s*(\S+)/.exec(body);
 
@@ -103,7 +104,7 @@ function parseTransferToOtherBank(body: string): ParseResult {
   // If it matches one of the user's own account aliases, this is money
   // moving between the user's own accounts, not real spending.
   const destNameMatch = /ke\s+([a-z\s]+?)\s+dengan\s+nomor\s+rekening/i.exec(body);
-  const destName = destNameMatch?.[1]?.trim().toLowerCase();
+  const destName = destNameMatch?.[1] ? decodeHtmlEntities(destNameMatch[1].trim()).toLowerCase() : undefined;
   const ownAliases = getOwnAccountAliases();
   if (destName && ownAliases.some((alias) => destName.includes(alias))) {
     return { skip: true, reason: "self-transfer, not an expense" };

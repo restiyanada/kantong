@@ -1,6 +1,6 @@
 import { DAILY_EXPENSE_CATEGORIES, DAILY_INCOME_CATEGORIES } from "@/types";
 import { formatIDR } from "../format";
-import { createDailyTransaction, resolveDailyCategory } from "../db/dailyTransactions";
+import { createDailyTransaction, resolveDailyCategory, updateDailyTransactionNote } from "../db/dailyTransactions";
 import { createSavingsTransaction } from "../db/savingsTransactions";
 import {
   createCertificate,
@@ -36,6 +36,18 @@ interface LineOutcome {
   /** Human-readable detail; shown directly for single-line messages, or
    * alongside the summary count for bulk pastes (attention-only). */
   detail?: string;
+  /** Only set for a single-line, no-note Daily log — prompts the user's
+   * client to reply directly to the confirmation with a note. Never set
+   * for bulk pastes (would mean one prompt per line, which is too noisy). */
+  forceReply?: boolean;
+}
+
+/** Embedded in the "add a note?" prompt text so the reply can be matched back to the transaction. */
+const NOTE_REF_PATTERN = /\(ref:([^)]+)\)/;
+
+function extractNoteRef(promptText: string | undefined): string | null {
+  if (!promptText) return null;
+  return NOTE_REF_PATTERN.exec(promptText)?.[1] ?? null;
 }
 
 async function handleMessage(message: TelegramMessage): Promise<void> {
@@ -44,6 +56,16 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
 
   if (!text) {
     await sendMessage(chatId, "Send a text message to log a transaction.");
+    return;
+  }
+
+  // A reply to the "add a note?" prompt sets that transaction's note,
+  // instead of being parsed as a new transaction to log.
+  const noteRef = extractNoteRef(message.reply_to_message?.text);
+  if (noteRef) {
+    const note = text.trim();
+    await updateDailyTransactionNote(noteRef, note);
+    await sendMessage(chatId, `✅ Note saved: "${note}"`);
     return;
   }
 
@@ -70,7 +92,12 @@ async function handleMessage(message: TelegramMessage): Promise<void> {
     );
   } else if (outcomes[0]?.detail) {
     const prefix = outcomes[0].status === "logged" ? "✅" : "⚠️";
-    await sendMessage(chatId, `${prefix} ${outcomes[0].detail}`);
+    const text = `${prefix} ${outcomes[0].detail}`;
+    if (outcomes[0].forceReply) {
+      await sendMessage(chatId, text, { force_reply: true });
+    } else {
+      await sendMessage(chatId, text);
+    }
   }
 
   for (const prompt of deferredPrompts) {
@@ -107,7 +134,7 @@ async function processLine(
       }
 
       // `category` is guaranteed non-null here since needsCategory is false.
-      await createDailyTransaction({
+      const id = await createDailyTransaction({
         type: line.type,
         amount: line.amount,
         category: line.category as string,
@@ -115,9 +142,17 @@ async function processLine(
         note: line.note,
         date: line.date,
       });
+      const sign = line.type === "income" ? "+" : "-";
+      if (line.note) {
+        return {
+          status: "logged",
+          detail: `${sign}${formatIDR(line.amount)} — ${line.category} (${line.note})`,
+        };
+      }
       return {
         status: "logged",
-        detail: `${line.type === "income" ? "+" : "-"}${formatIDR(line.amount)} — ${line.category}${line.note ? ` (${line.note})` : ""}`,
+        detail: `${sign}${formatIDR(line.amount)} — ${line.category}\n✏️ Add a note? Reply to this message. (ref:${id})`,
+        forceReply: true,
       };
     }
 

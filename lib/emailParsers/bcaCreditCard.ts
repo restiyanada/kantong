@@ -1,6 +1,7 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseDashedDMYDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
+import { decodeHtmlEntities } from "./decodeEntities";
 import type { ParseResult } from "./types";
 
 /**
@@ -21,7 +22,7 @@ import type { ParseResult } from "./types";
  */
 export function parseBCACreditCard(body: string): ParseResult {
   const merchantMatch = /Merchant\s*\/\s*ATM\s*:\s*(.+)/.exec(body);
-  const merchant = merchantMatch ? merchantMatch[1].trim() : null;
+  const merchant = merchantMatch ? decodeHtmlEntities(merchantMatch[1].trim()) : null;
   if (!merchant) return null;
 
   if (/^grab/i.test(merchant)) {

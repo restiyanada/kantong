@@ -1,7 +1,8 @@
 "use client";
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { formatIDR } from "@/lib/format";
+import { displayIDR } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 
 export interface DonutSlice {
   label: string;
@@ -18,6 +19,7 @@ export function DonutChart({
   centerLabel?: string;
   centerValue?: string;
 }) {
+  const { hidden } = useBalanceVisibility();
   const total = data.reduce((sum, d) => sum + Math.max(d.value, 0), 0);
   const chartData = data.map((d) => ({ ...d, sliceValue: Math.max(d.value, 0) }));
 
@@ -48,7 +50,7 @@ export function DonutChart({
             ))}
           </Pie>
           <Tooltip
-            formatter={(value) => formatIDR(Number(value))}
+            formatter={(value) => displayIDR(Number(value), hidden)}
             contentStyle={{
               borderRadius: 10,
               border: "1px solid #EAEAE6",

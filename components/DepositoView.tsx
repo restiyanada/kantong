@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { ArrowLeft } from "lucide-react";
 import type { DepositoCertificateDecrypted } from "@/types";
 import { computeDepositoTotal, depositoBadge } from "@/lib/aggregations";
-import { formatIDR, formatMediumDate } from "@/lib/format";
+import { displayIDR, formatMediumDate } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 
@@ -17,6 +18,7 @@ export function DepositoView({
   todayISO: string;
   onBack: () => void;
 }) {
+  const { hidden } = useBalanceVisibility();
   const total = useMemo(() => computeDepositoTotal(certificates), [certificates]);
   const sorted = useMemo(
     () => [...certificates].sort((a, b) => b.openedDate.localeCompare(a.openedDate)),
@@ -61,7 +63,7 @@ export function DepositoView({
                   </div>
                   <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
                     <span className="tabular-nums text-sm font-semibold text-[#1A1B1E]">
-                      {formatIDR(c.principal)}
+                      {displayIDR(c.principal, hidden)}
                     </span>
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-medium ${

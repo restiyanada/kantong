@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { ChevronRight } from "lucide-react";
-import { formatIDR } from "@/lib/format";
+import { displayIDR } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 
 export interface AllocationItem {
   label: string;
@@ -11,6 +12,7 @@ export interface AllocationItem {
 }
 
 export function AllocationList({ items }: { items: AllocationItem[] }) {
+  const { hidden } = useBalanceVisibility();
   const total = items.reduce((sum, i) => sum + Math.max(i.value, 0), 0);
   const max = Math.max(...items.map((i) => Math.abs(i.value)), 1);
 
@@ -50,7 +52,7 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
                 )}
                 <span className="truncate text-sm font-medium text-[#1A1B1E]">{item.label}</span>
                 <span className="shrink-0 tabular-nums text-sm text-[#8A8C8E]">
-                  {formatIDR(item.value)}
+                  {displayIDR(item.value, hidden)}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-1">

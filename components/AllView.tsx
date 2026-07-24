@@ -8,7 +8,8 @@ import {
   filterByTimeRange,
   type TimeRange,
 } from "@/lib/aggregations";
-import { formatIDR } from "@/lib/format";
+import { displayIDR } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 import { TimeRangeTabs } from "./TimeRangeTabs";
@@ -46,6 +47,7 @@ export function AllView({
   onSelectDeposito: () => void;
 }) {
   const [range, setRange] = useState<TimeRange>("3M");
+  const { hidden } = useBalanceVisibility();
 
   const dailyBalance = useMemo(
     () => daily.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
@@ -85,7 +87,7 @@ export function AllView({
         <DonutChart
           data={POCKET_META.map((p) => ({ label: p.label, value: values[p.key], color: p.color }))}
           centerLabel="Total"
-          centerValue={formatIDR(breakdown.total)}
+          centerValue={displayIDR(breakdown.total, hidden)}
         />
         <div className="mt-6">
           <AllocationList

@@ -3,6 +3,14 @@ export function formatIDR(amount: number): string {
   return `Rp${amount.toLocaleString("en-US")}`;
 }
 
+/** Placeholder shown instead of a real amount when balances are hidden. */
+export const MASKED_AMOUNT = "Rp••••••";
+
+/** Formats an amount, or returns the masked placeholder when `hidden` is true. */
+export function displayIDR(amount: number, hidden: boolean): string {
+  return hidden ? MASKED_AMOUNT : formatIDR(amount);
+}
+
 /** Formats a YYYY-MM-DD date as "17 Jan" — used for chart axes/tooltips. */
 export function formatShortDate(dateISO: string): string {
   const [year, month, day] = dateISO.split("-").map(Number);

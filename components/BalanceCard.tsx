@@ -1,4 +1,5 @@
-import { formatIDR } from "@/lib/format";
+import { displayIDR } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 
 export function BalanceCard({
   label,
@@ -9,6 +10,8 @@ export function BalanceCard({
   balance: number;
   stats?: { label: string; value: number; tone: "positive" | "negative" }[];
 }) {
+  const { hidden } = useBalanceVisibility();
+
   return (
     <div className="relative overflow-hidden rounded-xl border border-[#EAEAE6] bg-white p-5 shadow-[0_1px_2px_rgba(26,27,30,0.04)] sm:p-8">
       <div
@@ -17,7 +20,7 @@ export function BalanceCard({
       />
       <p className="relative text-sm font-medium text-[#6B6D70]">{label}</p>
       <p className="relative mt-1.5 text-[2.25rem] font-semibold leading-none tracking-tight tabular-nums text-[#1A1B1E] sm:text-[2.75rem]">
-        {formatIDR(balance)}
+        {displayIDR(balance, hidden)}
       </p>
       {stats && stats.length > 0 && (
         <div className="relative mt-6 flex flex-wrap gap-x-8 gap-y-3 border-t border-[#F0F0EE] pt-5">
@@ -29,7 +32,7 @@ export function BalanceCard({
                   s.tone === "positive" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
                 }`}
               >
-                {formatIDR(s.value)}
+                {displayIDR(s.value, hidden)}
               </p>
             </div>
           ))}

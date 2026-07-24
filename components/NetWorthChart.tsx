@@ -10,7 +10,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { formatIDR, formatShortDate } from "@/lib/format";
+import { displayIDR, formatShortDate } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import type { NetWorthPoint } from "@/lib/aggregations";
 
 export interface NetWorthSeriesConfig {
@@ -32,6 +33,8 @@ export function NetWorthChart({
   points: NetWorthPoint[];
   series?: NetWorthSeriesConfig[];
 }) {
+  const { hidden } = useBalanceVisibility();
+
   if (points.length === 0) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-1 text-center">
@@ -70,7 +73,7 @@ export function NetWorthChart({
           />
           <Tooltip
             formatter={(value, name) => [
-              formatIDR(Number(value)),
+              displayIDR(Number(value), hidden),
               series.find((s) => s.key === name)?.label ?? name,
             ]}
             labelFormatter={(label) => formatShortDate(String(label))}

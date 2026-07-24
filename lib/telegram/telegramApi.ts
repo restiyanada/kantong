@@ -1,4 +1,4 @@
-import type { InlineKeyboardMarkup } from "./telegramTypes";
+import type { InlineKeyboardMarkup, ForceReply } from "./telegramTypes";
 
 function apiUrl(method: string): string {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -24,7 +24,7 @@ async function callTelegramApi(method: string, body: object): Promise<void> {
 export async function sendMessage(
   chatId: number,
   text: string,
-  replyMarkup?: InlineKeyboardMarkup
+  replyMarkup?: InlineKeyboardMarkup | ForceReply
 ): Promise<void> {
   await callTelegramApi("sendMessage", {
     chat_id: chatId,

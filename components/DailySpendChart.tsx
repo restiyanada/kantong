@@ -9,10 +9,13 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { formatIDR, formatShortDate } from "@/lib/format";
+import { displayIDR, formatShortDate } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import type { DailySpendPoint } from "@/lib/aggregations";
 
 export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
+  const { hidden } = useBalanceVisibility();
+
   if (points.length === 0) {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-1 text-center">
@@ -48,7 +51,7 @@ export function DailySpendChart({ points }: { points: DailySpendPoint[] }) {
             width={0}
           />
           <Tooltip
-            formatter={(value) => formatIDR(Number(value))}
+            formatter={(value) => displayIDR(Number(value), hidden)}
             labelFormatter={(label) => formatShortDate(String(label))}
             contentStyle={{
               borderRadius: 10,

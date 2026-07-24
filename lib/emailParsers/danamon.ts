@@ -1,6 +1,7 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseIndonesianDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
+import { decodeHtmlEntities } from "./decodeEntities";
 import type { ParseResult } from "./types";
 
 /**
@@ -40,7 +41,7 @@ export function parseDanamon(subject: string, body: string): ParseResult {
   if (!date) return null;
 
   const merchantMatch = /Merchant Tujuan\s+(.+)/.exec(body);
-  const merchant = merchantMatch ? merchantMatch[1].trim() : "Danamon";
+  const merchant = decodeHtmlEntities(merchantMatch ? merchantMatch[1].trim() : "Danamon");
 
   const referenceMatch = /No\.\s*Referensi\s+(\S+)/.exec(body);
 

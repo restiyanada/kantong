@@ -54,6 +54,14 @@ export async function resolveDailyCategory(
   });
 }
 
+/** Sets the note on a transaction — used when the user replies to the "add a note?" prompt. */
+export async function updateDailyTransactionNote(
+  id: string,
+  note: string
+): Promise<void> {
+  await getDb().collection(COLLECTION).doc(id).update({ note });
+}
+
 export async function getDailyTransaction(
   id: string
 ): Promise<DailyTransactionDecrypted | null> {

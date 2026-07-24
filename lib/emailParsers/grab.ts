@@ -1,5 +1,6 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseEnglishAbbrevDate } from "./parseDate";
+import { decodeHtmlEntities } from "./decodeEntities";
 import type { ParseResult } from "./types";
 
 /**
@@ -43,13 +44,13 @@ function extractTotal(body: string): number | null {
 
 function extractDriverName(body: string): string | null {
   const match = /Diterbitkan oleh pengemudi\s+([^\n]+)/.exec(body);
-  return match ? match[1].trim() : null;
+  return match ? decodeHtmlEntities(match[1].trim()) : null;
 }
 
 /** Restaurant name from the "Pesanan Dari:" line (GrabFood receipts only). */
 function extractRestaurant(body: string): string | null {
   const match = /Pesanan Dari:\s*\n([^\n]+)/.exec(body);
-  return match ? match[1].trim() : null;
+  return match ? decodeHtmlEntities(match[1].trim()) : null;
 }
 
 /**
@@ -69,7 +70,7 @@ function extractTripLocations(
   const matches = [...section.matchAll(locationRegex)];
   if (matches.length < 2) return null;
 
-  return { pickup: matches[0][1].trim(), destination: matches[1][1].trim() };
+  return { pickup: decodeHtmlEntities(matches[0][1].trim()), destination: decodeHtmlEntities(matches[1][1].trim()) };
 }
 
 export function parseGrab(subject: string, body: string): ParseResult {
