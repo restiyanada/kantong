@@ -11,12 +11,13 @@ const BalanceVisibilityContext = createContext<{
 
 /** Wraps the dashboard so any component can read/toggle the hide-balances state. */
 export function BalanceVisibilityProvider({ children }: { children: ReactNode }) {
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(true);
 
   // Restore the last choice on load (defaults to visible for first-time users).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setHidden(window.localStorage.getItem(STORAGE_KEY) === "true");
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (stored !== null) setHidden(stored === "true");
   }, []);
 
   const toggle = () => {
