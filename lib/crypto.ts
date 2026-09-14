@@ -40,7 +40,7 @@ function getKey(): Buffer {
  * Encrypts a plaintext string. Stored format is a single string:
  *   base64(iv) + "." + base64(authTag) + "." + base64(ciphertext)
  */
-export function encrypt(plaintext: string): string {
+function encrypt(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
@@ -59,7 +59,7 @@ export function encrypt(plaintext: string): string {
 }
 
 /** Decrypts a string produced by `encrypt`. */
-export function decrypt(encrypted: string): string {
+function decrypt(encrypted: string): string {
   const key = getKey();
   const parts = encrypted.split(".");
   if (parts.length !== 3) {
