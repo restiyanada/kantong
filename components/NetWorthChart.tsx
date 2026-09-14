@@ -20,18 +20,12 @@ export interface NetWorthSeriesConfig {
   color: string;
 }
 
-const DEFAULT_SERIES: NetWorthSeriesConfig[] = [
-  { key: "daily", label: "Daily", color: "#3B6FA0" },
-  { key: "savings", label: "Savings", color: "#8659B5" },
-  { key: "deposito", label: "Deposito", color: "#2E8F94" },
-];
-
 export function NetWorthChart({
   points,
-  series = DEFAULT_SERIES,
+  series,
 }: {
   points: NetWorthPoint[];
-  series?: NetWorthSeriesConfig[];
+  series: NetWorthSeriesConfig[];
 }) {
   const { hidden } = useBalanceVisibility();
 
