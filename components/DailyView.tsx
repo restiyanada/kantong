@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { DailyTransactionDecrypted } from "@/types";
 import {
   computeDailySpend,
@@ -28,6 +28,8 @@ export function DailyView({
 }) {
   const [range, setRange] = useState<TimeRange>("1M");
   const [month, setMonth] = useState(monthOf(todayISO));
+  const [category, setCategory] = useState<string | null>(null);
+  const transactionsRef = useRef<HTMLDivElement>(null);
 
   const dailySpend = useMemo(() => computeDailySpend(transactions), [transactions]);
   const chartPoints = useMemo(
@@ -74,16 +76,27 @@ export function DailyView({
                 label: c.category,
                 value: c.total,
                 color: categoryColor(c.category),
+                onClick: () => {
+                  setCategory(c.category);
+                  transactionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+                },
               }))}
             />
           )}
         </Panel>
       </div>
 
-      <Panel>
-        <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">Transactions</h2>
-        <DailyTransactionList transactions={transactions} month={month} />
-      </Panel>
+      <div ref={transactionsRef}>
+        <Panel>
+          <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">Transactions</h2>
+          <DailyTransactionList
+            transactions={transactions}
+            month={month}
+            category={category}
+            onClearCategory={() => setCategory(null)}
+          />
+        </Panel>
+      </div>
     </div>
   );
 }
