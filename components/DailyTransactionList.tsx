@@ -19,18 +19,28 @@ const DAYS_PER_PAGE = 3;
 export function DailyTransactionList({
   transactions,
   month,
+  category,
+  onClearCategory,
 }: {
   transactions: DailyTransactionDecrypted[];
   month: string;
+  /** Set when a category in the breakdown above was clicked — narrows the list to it. */
+  category?: string | null;
+  onClearCategory?: () => void;
 }) {
   const [type, setType] = useState<(typeof TYPE_FILTERS)[number]>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const { hidden } = useBalanceVisibility();
 
-  useEffect(() => setPage(1), [month, type, search]);
+  useEffect(() => setPage(1), [month, type, search, category]);
 
-  const filtered = filterDailyTransactions(transactions, { month, type, searchText: search });
+  const filtered = filterDailyTransactions(transactions, {
+    month,
+    type,
+    category: category ?? undefined,
+    searchText: search,
+  });
   const groups = groupTransactionsByDay(filtered);
   const totalPages = Math.max(1, Math.ceil(groups.length / DAYS_PER_PAGE));
   const pagedGroups = paginateDayGroups(groups, page, DAYS_PER_PAGE);
@@ -65,6 +75,15 @@ export function DailyTransactionList({
           />
         </div>
       </div>
+
+      {category && (
+        <button
+          onClick={onClearCategory}
+          className="mb-4 inline-flex items-center gap-1.5 rounded-full bg-[#F0F0EE] px-3 py-1 text-xs font-medium text-[#1A1B1E] transition-colors duration-150 hover:bg-[#EAEAE6]"
+        >
+          Category: {category} ✕
+        </button>
+      )}
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-1 py-12 text-center">

@@ -102,6 +102,7 @@ export function computeMonthlyTotals(
 export interface TransactionFilter {
   month?: string; // YYYY-MM
   type?: "all" | "income" | "expense";
+  category?: string;
   searchText?: string;
 }
 
@@ -113,6 +114,7 @@ export function filterDailyTransactions(
   return transactions
     .filter((t) => !filter.month || t.date.startsWith(filter.month))
     .filter((t) => !filter.type || filter.type === "all" || t.type === filter.type)
+    .filter((t) => !filter.category || t.category === filter.category)
     .filter((t) => !search || t.note.toLowerCase().includes(search))
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
 }

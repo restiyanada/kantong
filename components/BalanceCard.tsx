@@ -4,11 +4,9 @@ import { useBalanceVisibility } from "@/lib/balanceVisibility";
 export function BalanceCard({
   label,
   balance,
-  stats,
 }: {
   label: string;
   balance: number;
-  stats?: { label: string; value: number; tone: "positive" | "negative" }[];
 }) {
   const { hidden } = useBalanceVisibility();
 
@@ -22,22 +20,6 @@ export function BalanceCard({
       <p className="relative mt-1.5 text-[2.25rem] font-semibold leading-none tracking-tight tabular-nums text-[#1A1B1E] sm:text-[2.75rem]">
         {displayIDR(balance, hidden)}
       </p>
-      {stats && stats.length > 0 && (
-        <div className="relative mt-6 flex flex-wrap gap-x-8 gap-y-3 border-t border-[#F0F0EE] pt-5">
-          {stats.map((s) => (
-            <div key={s.label}>
-              <p className="text-xs text-[#8A8C8E]">{s.label}</p>
-              <p
-                className={`mt-0.5 tabular-nums text-sm font-semibold ${
-                  s.tone === "positive" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
-                }`}
-              >
-                {displayIDR(s.value, hidden)}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
