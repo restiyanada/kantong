@@ -83,7 +83,7 @@ function EditSheet({
             value={date}
             onChange={(e) => setDate(e.target.value)}
             required
-            className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-base"
           />
         )}
         <input type="hidden" name="date" value={date} />
@@ -91,7 +91,7 @@ function EditSheet({
           name="category"
           defaultValue={t.category}
           required
-          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-base"
         >
           {(t.type === "income" ? DAILY_INCOME_CATEGORIES : DAILY_EXPENSE_CATEGORIES).map((c) => (
             <option key={c} value={c}>
@@ -105,14 +105,14 @@ function EditSheet({
           min={1}
           defaultValue={t.amount}
           required
-          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-base"
         />
         <input
           name="note"
           type="text"
           defaultValue={t.note}
           placeholder="Note"
-          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-sm"
+          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-base"
         />
         <div className="flex gap-2 pt-1">
           <button
@@ -190,7 +190,7 @@ export function DailyTransactionList({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search notes…"
-            className="w-full rounded-full border border-[#EAEAE6] py-1.5 pl-8 pr-3 text-sm text-[#1A1B1E] outline-none transition-colors duration-150 placeholder:text-[#ADAFAF] focus:border-[#1E7A5F]"
+            className="w-full rounded-full border border-[#EAEAE6] py-1.5 pl-8 pr-3 text-base text-[#1A1B1E] outline-none transition-colors duration-150 placeholder:text-[#ADAFAF] focus:border-[#1E7A5F]"
           />
         </div>
       </div>
@@ -253,7 +253,7 @@ export function DailyTransactionList({
                     {!t.pending && (
                       <button
                         onClick={() => setEditingId(t.id)}
-                        className="shrink-0 text-xs text-[#ADAFAF] opacity-0 transition-opacity duration-150 hover:text-[#1A1B1E] group-hover:opacity-100"
+                        className="shrink-0 self-center text-xs font-medium text-[#8A8C8E] transition-colors duration-150 hover:text-[#1A1B1E]"
                       >
                         Edit
                       </button>
