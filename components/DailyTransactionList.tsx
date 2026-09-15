@@ -11,6 +11,7 @@ import {
   paginateDayGroups,
 } from "@/lib/aggregations";
 import { editDailyTransaction } from "@/app/actions";
+import { getTodayISO, addDays } from "@/lib/telegram/dateUtils";
 import { Pagination } from "./Pagination";
 import {
   DAILY_EXPENSE_CATEGORIES,
@@ -30,6 +31,10 @@ function EditSheet({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const today = getTodayISO();
+  const yesterday = addDays(today, -1);
+  const [date, setDate] = useState(t.date);
+  const [customDate, setCustomDate] = useState(t.date !== today && t.date !== yesterday);
 
   useEffect(() => ref.current?.showModal(), []);
 
@@ -41,13 +46,47 @@ function EditSheet({
     >
       <form action={editDailyTransaction.bind(null, t.id)} onSubmit={onClose} className="space-y-3">
         <h3 className="text-sm font-medium text-[#1A1B1E]">Edit transaction</h3>
-        <input
-          name="date"
-          type="date"
-          defaultValue={t.date}
-          required
-          className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-sm"
-        />
+        <div className="flex gap-1.5">
+          {([
+            ["Today", today],
+            ["Yesterday", yesterday],
+          ] as const).map(([label, value]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setDate(value);
+                setCustomDate(false);
+              }}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+                !customDate && date === value
+                  ? "bg-[#1A1B1E] text-white"
+                  : "border border-[#EAEAE6] text-[#6B6D70]"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setCustomDate(true)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+              customDate ? "bg-[#1A1B1E] text-white" : "border border-[#EAEAE6] text-[#6B6D70]"
+            }`}
+          >
+            Other date
+          </button>
+        </div>
+        {customDate && (
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            required
+            className="w-full rounded-lg border border-[#EAEAE6] px-3 py-2 text-sm"
+          />
+        )}
+        <input type="hidden" name="date" value={date} />
         <select
           name="category"
           defaultValue={t.category}
