@@ -42,6 +42,7 @@ function EditSheet({
     <dialog
       ref={ref}
       onClose={onClose}
+      onClick={(e) => e.stopPropagation()}
       className="m-0 mb-0 mt-auto w-full max-w-none rounded-t-2xl p-5 pb-8 backdrop:bg-black/40 sm:mx-auto sm:mb-auto sm:max-w-sm sm:rounded-2xl"
     >
       <form action={editDailyTransaction.bind(null, t.id)} onSubmit={onClose} className="space-y-3">
@@ -220,7 +221,10 @@ export function DailyTransactionList({
                 {group.transactions.map((t) => (
                   <li
                     key={t.id}
-                    className="group flex items-start gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
+                    onClick={t.pending ? undefined : () => setEditingId(t.id)}
+                    className={`flex items-start gap-3 py-3 transition-colors duration-150 sm:-mx-2 sm:px-2 sm:rounded-lg ${
+                      t.pending ? "" : "cursor-pointer hover:bg-[#FAFAF9]"
+                    }`}
                   >
                     <span
                       className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
@@ -250,14 +254,6 @@ export function DailyTransactionList({
                         {t.pending ? "Needs a category" : t.category}
                       </p>
                     </div>
-                    {!t.pending && (
-                      <button
-                        onClick={() => setEditingId(t.id)}
-                        className="shrink-0 self-center text-xs font-medium text-[#8A8C8E] transition-colors duration-150 hover:text-[#1A1B1E]"
-                      >
-                        Edit
-                      </button>
-                    )}
                     {editingId === t.id && (
                       <EditSheet transaction={t} onClose={() => setEditingId(null)} />
                     )}
