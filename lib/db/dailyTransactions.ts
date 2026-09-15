@@ -62,6 +62,22 @@ export async function updateDailyTransactionNote(
   await getDb().collection(COLLECTION).doc(id).update({ note });
 }
 
+/** Corrects amount/category/note/date on an already-logged transaction (web edit form). */
+export async function updateDailyTransaction(
+  id: string,
+  data: { amount: number; category: string; note: string; date: string }
+): Promise<void> {
+  await getDb()
+    .collection(COLLECTION)
+    .doc(id)
+    .update({
+      amount: encryptAmount(data.amount),
+      category: data.category,
+      note: data.note,
+      date: data.date,
+    });
+}
+
 export async function getDailyTransaction(
   id: string
 ): Promise<DailyTransactionDecrypted | null> {

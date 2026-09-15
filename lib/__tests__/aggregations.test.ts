@@ -110,7 +110,7 @@ describe("filterDailyTransactions", () => {
   const txns = [
     daily({ id: "a", type: "expense", note: "nasi goreng", date: "2026-07-01" }),
     daily({ id: "b", type: "income", note: "gaji juli", date: "2026-07-05" }),
-    daily({ id: "c", type: "expense", note: "ojek pulang", date: "2026-06-20" }),
+    daily({ id: "c", type: "expense", note: "ojek pulang", date: "2026-06-20", category: "Transport" }),
   ];
 
   it("filters by month", () => {
@@ -122,6 +122,12 @@ describe("filterDailyTransactions", () => {
 
   it("filters by type", () => {
     expect(filterDailyTransactions(txns, { type: "income" }).map((t) => t.id)).toEqual(["b"]);
+  });
+
+  it("filters by category", () => {
+    expect(filterDailyTransactions(txns, { category: "Transport" }).map((t) => t.id)).toEqual([
+      "c",
+    ]);
   });
 
   it("filters by search text (case-insensitive)", () => {
