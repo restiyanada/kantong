@@ -10,8 +10,13 @@ import {
   groupTransactionsByDay,
   paginateDayGroups,
 } from "@/lib/aggregations";
+import { editDailyTransaction } from "@/app/actions";
 import { Pagination } from "./Pagination";
-import type { DailyTransactionDecrypted } from "@/types";
+import {
+  DAILY_EXPENSE_CATEGORIES,
+  DAILY_INCOME_CATEGORIES,
+  type DailyTransactionDecrypted,
+} from "@/types";
 
 const TYPE_FILTERS = ["all", "expense", "income"] as const;
 const DAYS_PER_PAGE = 3;
@@ -31,6 +36,7 @@ export function DailyTransactionList({
   const [type, setType] = useState<(typeof TYPE_FILTERS)[number]>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const { hidden } = useBalanceVisibility();
 
   useEffect(() => setPage(1), [month, type, search, category]);
@@ -98,41 +104,109 @@ export function DailyTransactionList({
                 {formatDateWithDay(group.date)}
               </p>
               <ul className="divide-y divide-[#F0F0EE]">
-                {group.transactions.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex items-start gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
-                  >
-                    <span
-                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                        t.pending ? "border-2 border-[#B8862B] bg-white" : ""
-                      }`}
-                      style={t.pending ? undefined : { backgroundColor: categoryColor(t.category) }}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-[#1A1B1E]">
-                          {t.note || "—"}
-                        </span>
-                        <span
-                          className={`shrink-0 tabular-nums text-sm font-semibold ${
-                            t.type === "income" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
+                {group.transactions.map((t) =>
+                  editingId === t.id ? (
+                    <li key={t.id} className="py-3">
+                      <form
+                        action={editDailyTransaction.bind(null, t.id)}
+                        onSubmit={() => setEditingId(null)}
+                        className="flex flex-wrap items-center gap-2"
+                      >
+                        <input
+                          name="date"
+                          type="date"
+                          defaultValue={t.date}
+                          required
+                          className="rounded-lg border border-[#EAEAE6] px-2 py-1 text-sm"
+                        />
+                        <select
+                          name="category"
+                          defaultValue={t.category}
+                          required
+                          className="rounded-lg border border-[#EAEAE6] px-2 py-1 text-sm"
+                        >
+                          {(t.type === "income" ? DAILY_INCOME_CATEGORIES : DAILY_EXPENSE_CATEGORIES).map(
+                            (c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            )
+                          )}
+                        </select>
+                        <input
+                          name="amount"
+                          type="number"
+                          min={1}
+                          defaultValue={t.amount}
+                          required
+                          className="w-28 rounded-lg border border-[#EAEAE6] px-2 py-1 text-sm"
+                        />
+                        <input
+                          name="note"
+                          type="text"
+                          defaultValue={t.note}
+                          placeholder="Note"
+                          className="min-w-0 flex-1 rounded-lg border border-[#EAEAE6] px-2 py-1 text-sm"
+                        />
+                        <button
+                          type="submit"
+                          className="rounded-lg bg-[#1A1B1E] px-3 py-1 text-sm font-medium text-white"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          className="rounded-lg px-3 py-1 text-sm text-[#6B6D70]"
+                        >
+                          Cancel
+                        </button>
+                      </form>
+                    </li>
+                  ) : (
+                    <li
+                      key={t.id}
+                      className="group flex items-start gap-3 py-3 transition-colors duration-150 hover:bg-[#FAFAF9] sm:-mx-2 sm:px-2 sm:rounded-lg"
+                    >
+                      <span
+                        className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                          t.pending ? "border-2 border-[#B8862B] bg-white" : ""
+                        }`}
+                        style={t.pending ? undefined : { backgroundColor: categoryColor(t.category) }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="truncate text-sm font-medium text-[#1A1B1E]">
+                            {t.note || "—"}
+                          </span>
+                          <span
+                            className={`shrink-0 tabular-nums text-sm font-semibold ${
+                              t.type === "income" ? "text-[#1E7A5F]" : "text-[#B23B3B]"
+                            }`}
+                          >
+                            {t.type === "income" ? "+" : "-"}
+                            {displayIDR(t.amount, hidden)}
+                          </span>
+                        </div>
+                        <p
+                          className={`mt-0.5 text-xs ${
+                            t.pending ? "font-medium text-[#B8862B]" : "text-[#8A8C8E]"
                           }`}
                         >
-                          {t.type === "income" ? "+" : "-"}
-                          {displayIDR(t.amount, hidden)}
-                        </span>
+                          {t.pending ? "Needs a category" : t.category}
+                        </p>
                       </div>
-                      <p
-                        className={`mt-0.5 text-xs ${
-                          t.pending ? "font-medium text-[#B8862B]" : "text-[#8A8C8E]"
-                        }`}
-                      >
-                        {t.pending ? "Needs a category" : t.category}
-                      </p>
-                    </div>
-                  </li>
-                ))}
+                      {!t.pending && (
+                        <button
+                          onClick={() => setEditingId(t.id)}
+                          className="shrink-0 text-xs text-[#ADAFAF] opacity-0 transition-opacity duration-150 hover:text-[#1A1B1E] group-hover:opacity-100"
+                        >
+                          Edit
+                        </button>
+                      )}
+                    </li>
+                  )
+                )}
               </ul>
             </div>
           ))}
