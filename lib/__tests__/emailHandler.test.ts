@@ -40,7 +40,13 @@ describe("handleIncomingEmail", () => {
       messageId: "gmail-msg-1",
     });
 
-    expect(outcome).toEqual({ logged: true, category: "Food", amount: 5200 });
+    expect(outcome).toEqual({
+      logged: true,
+      category: "Food",
+      amount: 5200,
+      note: "FMI PLAZA OLEOS",
+      pending: false,
+    });
     expect(createDailyTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "expense",
@@ -62,7 +68,11 @@ describe("handleIncomingEmail", () => {
       messageId: "gmail-msg-1",
     });
 
-    expect(outcome).toEqual({ logged: false, reason: "duplicate (already logged)" });
+    expect(outcome).toEqual({
+      logged: false,
+      reason: "duplicate (already logged)",
+      notify: false,
+    });
     expect(createDailyTransaction).not.toHaveBeenCalled();
   });
 
@@ -75,6 +85,7 @@ describe("handleIncomingEmail", () => {
     });
 
     expect(outcome.logged).toBe(false);
+    expect(outcome).toMatchObject({ notify: false });
     expect(createDailyTransaction).not.toHaveBeenCalled();
   });
 
@@ -89,6 +100,7 @@ describe("handleIncomingEmail", () => {
     expect(outcome).toEqual({
       logged: false,
       reason: "unrecognized sender or unparseable email",
+      notify: true,
     });
     expect(createDailyTransaction).not.toHaveBeenCalled();
   });

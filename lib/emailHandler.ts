@@ -10,8 +10,11 @@ export interface IncomingEmail {
 }
 
 export type EmailOutcome =
-  | { logged: true; category: string; amount: number }
-  | { logged: false; reason: string };
+  | { logged: true; category: string; amount: number; note: string; pending: boolean }
+  /** `notify: true` only for a genuine failure (couldn't parse at all) — a
+   *  duplicate or a deliberate skip (self-transfer, e-wallet top-up) is
+   *  expected behavior, not something worth pinging about. */
+  | { logged: false; reason: string; notify: boolean };
 
 /**
  * Handles one incoming bank/e-wallet email: dedupe, parse, and (if
@@ -27,16 +30,20 @@ export async function handleIncomingEmail(
 ): Promise<EmailOutcome> {
   const alreadyLogged = await dailyTransactionExistsForMessage(email.messageId);
   if (alreadyLogged) {
-    return { logged: false, reason: "duplicate (already logged)" };
+    return { logged: false, reason: "duplicate (already logged)", notify: false };
   }
 
   const result = parseSourceEmail(email.from, email.subject, email.body);
 
   if (result === null) {
-    return { logged: false, reason: "unrecognized sender or unparseable email" };
+    return {
+      logged: false,
+      reason: "unrecognized sender or unparseable email",
+      notify: true,
+    };
   }
   if (isSkip(result)) {
-    return { logged: false, reason: result.reason };
+    return { logged: false, reason: result.reason, notify: false };
   }
 
   await createDailyTransaction({
@@ -49,5 +56,11 @@ export async function handleIncomingEmail(
     sourceMessageId: email.messageId,
   });
 
-  return { logged: true, category: result.category, amount: result.amount };
+  return {
+    logged: true,
+    category: result.category,
+    amount: result.amount,
+    note: result.note,
+    pending: result.pending,
+  };
 }
