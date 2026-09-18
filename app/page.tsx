@@ -18,7 +18,12 @@ export default async function Home() {
     listDailyTransactions(),
     listSavingsTransactions(),
     listCertificates(),
-    getBudgetForCycle(budgetCycleOf(todayISO, PAYDAY_DAY)),
+    // Isolated: a problem loading budgets should never take down the rest
+    // of the dashboard — it's the newest, least-exercised read here.
+    getBudgetForCycle(budgetCycleOf(todayISO, PAYDAY_DAY)).catch((err) => {
+      console.error("Failed to load budgets:", err);
+      return {};
+    }),
   ]);
 
   return (

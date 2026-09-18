@@ -1,4 +1,3 @@
-import { FieldPath } from "firebase-admin/firestore";
 import { getDb } from "../firestore";
 
 const COLLECTION = "budgets";
@@ -12,21 +11,23 @@ export type BudgetLimits = Record<string, number>;
 /**
  * Reads the budget for a cycle, carrying forward from the most recent
  * earlier cycle that has one — so a limit only needs to be set again when
- * it actually changes, not every cycle. Cycle keys are YYYY-MM strings,
- * so lexicographic ordering matches chronological ordering.
+ * it actually changes, not every cycle. Cycle keys are YYYY-MM strings, so
+ * string comparison matches chronological ordering. Fetches the whole
+ * (small — at most one doc per month, ever) collection and picks the
+ * closest match in JS, same pattern as every other db/*.ts read in this
+ * codebase, rather than a Firestore document-ID range query.
  */
 export async function getBudgetForCycle(cycle: string): Promise<BudgetLimits> {
-  const doc = await getDb().collection(COLLECTION).doc(cycle).get();
-  if (doc.exists) return doc.data() as BudgetLimits;
+  const snap = await getDb().collection(COLLECTION).get();
 
-  const snap = await getDb()
-    .collection(COLLECTION)
-    .where(FieldPath.documentId(), "<", cycle)
-    .orderBy(FieldPath.documentId(), "desc")
-    .limit(1)
-    .get();
+  let best: { id: string; data: BudgetLimits } | null = null;
+  for (const doc of snap.docs) {
+    if (doc.id <= cycle && (!best || doc.id > best.id)) {
+      best = { id: doc.id, data: doc.data() as BudgetLimits };
+    }
+  }
 
-  return snap.empty ? {} : (snap.docs[0].data() as BudgetLimits);
+  return best?.data ?? {};
 }
 
 /** Sets one category's limit for a cycle — merges, leaving other categories untouched. */
