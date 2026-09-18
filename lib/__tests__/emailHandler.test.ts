@@ -5,11 +5,17 @@ vi.mock("../db/dailyTransactions", () => ({
   dailyTransactionExistsForMessage: vi.fn(async () => false),
 }));
 
+vi.mock("../db/emailFailures", () => ({
+  alreadyNotifiedFailure: vi.fn(async () => false),
+  recordFailureNotified: vi.fn(async () => {}),
+}));
+
 import { handleIncomingEmail } from "../emailHandler";
 import {
   createDailyTransaction,
   dailyTransactionExistsForMessage,
 } from "../db/dailyTransactions";
+import { alreadyNotifiedFailure, recordFailureNotified } from "../db/emailFailures";
 
 const BCA_BODY = `
 Status : Berhasil
@@ -103,5 +109,24 @@ describe("handleIncomingEmail", () => {
       notify: true,
     });
     expect(createDailyTransaction).not.toHaveBeenCalled();
+    expect(recordFailureNotified).toHaveBeenCalledWith("gmail-msg-3");
+  });
+
+  it("does not re-notify a retry of the same unparseable message", async () => {
+    vi.mocked(alreadyNotifiedFailure).mockResolvedValueOnce(true);
+
+    const outcome = await handleIncomingEmail({
+      from: "someone@example.com",
+      subject: "hi",
+      body: "not a bank email",
+      messageId: "gmail-msg-3",
+    });
+
+    expect(outcome).toEqual({
+      logged: false,
+      reason: "unrecognized sender or unparseable email",
+      notify: false,
+    });
+    expect(recordFailureNotified).not.toHaveBeenCalled();
   });
 });
