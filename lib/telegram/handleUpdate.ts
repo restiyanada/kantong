@@ -8,6 +8,8 @@ import {
   closeCertificate,
   renewCertificate,
 } from "../db/depositoCertificates";
+import { setBudgetLimit } from "../db/budgets";
+import { budgetCycleOf, formatMonthLabel, PAYDAY_DAY } from "../month";
 import { getTodayISO } from "./dateUtils";
 import { parseMessage } from "./parseMessage";
 import type { ParsedLine } from "./types";
@@ -226,6 +228,15 @@ async function processLine(
         )
       );
       return { status: "attention" };
+    }
+
+    case "budget_set": {
+      const cycle = budgetCycleOf(todayISO, PAYDAY_DAY);
+      await setBudgetLimit(cycle, line.category, line.limit);
+      return {
+        status: "logged",
+        detail: `Budget set: ${line.category} ${formatIDR(line.limit)} (cycle starting ${PAYDAY_DAY} ${formatMonthLabel(cycle)})`,
+      };
     }
 
     case "error": {

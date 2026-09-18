@@ -129,6 +129,28 @@ describe("Deposito pocket (5.4)", () => {
   });
 });
 
+describe("Budget", () => {
+  it("parses a category and jt-shorthand amount", () => {
+    const result = parseLine("budget food 2jt", TODAY);
+    expect(result).toMatchObject({ kind: "budget_set", category: "Food", limit: 2_000_000 });
+  });
+
+  it("accepts a plain digit amount", () => {
+    const result = parseLine("budget transport 500000", TODAY);
+    expect(result).toMatchObject({ kind: "budget_set", category: "Transport", limit: 500_000 });
+  });
+
+  it("errors on an unrecognized category", () => {
+    const result = parseLine("budget xyz 2jt", TODAY);
+    expect(result.kind).toBe("error");
+  });
+
+  it("errors on a missing or invalid amount", () => {
+    const result = parseLine("budget food", TODAY);
+    expect(result.kind).toBe("error");
+  });
+});
+
 describe("Backdated entries (5.5)", () => {
   it("applies a DD/MM prefix to a Daily line", () => {
     const result = parseLine("25/06 50000 food nasi padang", TODAY);

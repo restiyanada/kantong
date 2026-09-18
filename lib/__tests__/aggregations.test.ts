@@ -3,6 +3,7 @@ import {
   computeDailySpend,
   filterByTimeRange,
   computeCategoryBreakdown,
+  computeCycleSpendByCategory,
   computeMonthlyTotals,
   filterDailyTransactions,
   groupTransactionsByDay,
@@ -89,6 +90,25 @@ describe("computeCategoryBreakdown", () => {
       { category: "Food", total: 40000 },
       { category: "Transport", total: 10000 },
     ]);
+  });
+});
+
+describe("computeCycleSpendByCategory", () => {
+  it("sums by category within a pay cycle, not a calendar month", () => {
+    const txns = [
+      // Payday-25 cycle "2026-08" runs Aug 25 – Sep 24.
+      daily({ category: "Food", amount: 10000, date: "2026-08-26" }),
+      daily({ category: "Food", amount: 20000, date: "2026-09-24" }), // still in the Aug cycle
+      daily({ category: "Food", amount: 99999, date: "2026-09-25" }), // next cycle
+      daily({ category: "Transport", amount: 5000, date: "2026-09-01" }),
+      daily({ category: "", amount: 12345, date: "2026-09-01", pending: true }),
+      daily({ type: "income", category: "Salary", amount: 5000000, date: "2026-09-01" }),
+    ];
+
+    expect(computeCycleSpendByCategory(txns, "2026-08", 25)).toEqual({
+      Food: 30000,
+      Transport: 5000,
+    });
   });
 });
 

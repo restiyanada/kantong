@@ -54,6 +54,13 @@ export interface DepositoPerpanjangParsed {
   termMonths: number;
 }
 
+export interface BudgetSetParsed {
+  kind: "budget_set";
+  rawLine: string;
+  category: string;
+  limit: number;
+}
+
 export interface ParseErrorResult {
   kind: "error";
   rawLine: string;
@@ -66,4 +73,5 @@ export type ParsedLine =
   | DepositoOpenParsed
   | DepositoCairkanParsed
   | DepositoPerpanjangParsed
+  | BudgetSetParsed
   | ParseErrorResult;

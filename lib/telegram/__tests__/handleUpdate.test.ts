@@ -14,6 +14,9 @@ vi.mock("../../db/depositoCertificates", () => ({
   closeCertificate: vi.fn(async () => undefined),
   renewCertificate: vi.fn(async () => undefined),
 }));
+vi.mock("../../db/budgets", () => ({
+  setBudgetLimit: vi.fn(async () => undefined),
+}));
 vi.mock("../telegramApi", () => ({
   sendMessage: vi.fn(async () => undefined),
   answerCallbackQuery: vi.fn(async () => undefined),
@@ -30,8 +33,10 @@ import {
   closeCertificate,
   renewCertificate,
 } from "../../db/depositoCertificates";
+import { setBudgetLimit } from "../../db/budgets";
 import { sendMessage, answerCallbackQuery, editMessageText } from "../telegramApi";
 import { getTodayISO } from "../dateUtils";
+import { budgetCycleOf, PAYDAY_DAY } from "../../month";
 
 const CHAT_ID = 12345;
 
@@ -150,6 +155,28 @@ describe("handleUpdate — Savings", () => {
       expect.objectContaining({ direction: "in", amount: 1000000, goal: "General" })
     );
     expect(sendMessage).toHaveBeenCalledWith(CHAT_ID, expect.stringContaining("General"));
+  });
+});
+
+describe("handleUpdate — Budget", () => {
+  it("sets a budget limit for the current pay cycle and confirms it", async () => {
+    await handleUpdate(message("budget food 2jt"));
+
+    const expectedCycle = budgetCycleOf(getTodayISO(), PAYDAY_DAY);
+    expect(setBudgetLimit).toHaveBeenCalledWith(expectedCycle, "Food", 2_000_000);
+    const [, confirmation] = vi.mocked(sendMessage).mock.calls[0];
+    expect(confirmation).toContain("Food");
+    expect(confirmation).toContain("Rp2,000,000");
+  });
+
+  it("reports an error for an unrecognized category or missing amount", async () => {
+    await handleUpdate(message("budget xyz 2jt"));
+
+    expect(setBudgetLimit).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(
+      CHAT_ID,
+      expect.stringContaining("budget <category> <amount>")
+    );
   });
 });
 
