@@ -1,4 +1,5 @@
 import { createDailyTransaction, dailyTransactionExistsForMessage } from "./db/dailyTransactions";
+import { alreadyNotifiedFailure, recordFailureNotified } from "./db/emailFailures";
 import { parseSourceEmail, isSkip } from "./emailParsers";
 
 export interface IncomingEmail {
@@ -36,10 +37,12 @@ export async function handleIncomingEmail(
   const result = parseSourceEmail(email.from, email.subject, email.body);
 
   if (result === null) {
+    const alreadyNotified = await alreadyNotifiedFailure(email.messageId);
+    if (!alreadyNotified) await recordFailureNotified(email.messageId);
     return {
       logged: false,
       reason: "unrecognized sender or unparseable email",
-      notify: true,
+      notify: !alreadyNotified,
     };
   }
   if (isSkip(result)) {
