@@ -20,11 +20,13 @@ export function DashboardShell({
   savings,
   deposito,
   todayISO,
+  budgets,
 }: {
   daily: DailyTransactionDecrypted[];
   savings: SavingsTransactionDecrypted[];
   deposito: DepositoCertificateDecrypted[];
   todayISO: string;
+  budgets: Record<string, number>;
 }) {
   const [tab, setTab] = useState<PocketKey>("all");
 
@@ -54,7 +56,9 @@ export function DashboardShell({
               onSelectDeposito={() => setTab("deposito")}
             />
           )}
-          {tab === "daily" && <DailyView transactions={daily} todayISO={todayISO} />}
+          {tab === "daily" && (
+            <DailyView transactions={daily} todayISO={todayISO} budgets={budgets} />
+          )}
           {tab === "savings" && <SavingsView transactions={savings} />}
           {tab === "deposito" && (
             <DepositoView

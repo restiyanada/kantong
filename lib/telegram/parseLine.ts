@@ -54,6 +54,9 @@ export function parseLine(
   if (first === "deposito") {
     return parseDepositoLine(rawLine, tokens.slice(1), date, backdated);
   }
+  if (first === "budget") {
+    return parseBudgetLine(rawLine, tokens.slice(1));
+  }
   return parseDailyLine(rawLine, tokens, date, backdated);
 }
 
@@ -184,4 +187,26 @@ function parseDepositoLine(
     maturityDate: addMonths(date, termMonths),
     backdated,
   };
+}
+
+function parseBudgetLine(rawLine: string, tokens: string[]): ParsedLine {
+  const matched = matchLeadingKeyword(tokens, DAILY_EXPENSE_CATEGORY_KEYWORDS);
+  if (!matched) {
+    return {
+      kind: "error",
+      rawLine,
+      message: "Expected `budget <category> <amount>`, e.g. `budget food 2jt`",
+    };
+  }
+
+  const limit = matched.rest[0] ? parseMagnitude(matched.rest[0]) : null;
+  if (limit == null) {
+    return {
+      kind: "error",
+      rawLine,
+      message: "Expected `budget <category> <amount>`, e.g. `budget food 2jt`",
+    };
+  }
+
+  return { kind: "budget_set", rawLine, category: matched.matched, limit };
 }

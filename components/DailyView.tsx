@@ -6,10 +6,11 @@ import {
   computeDailySpend,
   filterByTimeRange,
   computeCategoryBreakdown,
+  computeCycleSpendByCategory,
   computeMonthlyTotals,
   type TimeRange,
 } from "@/lib/aggregations";
-import { monthOf } from "@/lib/month";
+import { monthOf, budgetCycleOf, formatMonthLabel, PAYDAY_DAY } from "@/lib/month";
 import { categoryColor } from "@/lib/categoryColors";
 import { BalanceCard } from "./BalanceCard";
 import { TimeRangeTabs } from "./TimeRangeTabs";
@@ -22,9 +23,12 @@ import { Panel } from "./Panel";
 export function DailyView({
   transactions,
   todayISO,
+  budgets,
 }: {
   transactions: DailyTransactionDecrypted[];
   todayISO: string;
+  /** Category -> monthly limit for the current pay cycle. */
+  budgets: Record<string, number>;
 }) {
   const [range, setRange] = useState<TimeRange>("1M");
   const [month, setMonth] = useState(monthOf(todayISO));
@@ -45,9 +49,32 @@ export function DailyView({
     [transactions, month]
   );
 
+  const cycle = budgetCycleOf(todayISO, PAYDAY_DAY);
+  const cycleSpend = useMemo(
+    () => computeCycleSpendByCategory(transactions, cycle, PAYDAY_DAY),
+    [transactions, cycle]
+  );
+  const budgetItems = Object.entries(budgets)
+    .map(([budgetCategory, limit]) => ({
+      label: budgetCategory,
+      value: cycleSpend[budgetCategory] ?? 0,
+      color: categoryColor(budgetCategory),
+      limit,
+    }))
+    .sort((a, b) => b.value / b.limit - a.value / a.limit);
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <BalanceCard label="Spending this month" balance={monthlyTotals.expense} />
+
+      {budgetItems.length > 0 && (
+        <Panel>
+          <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">
+            Budget — cycle since {PAYDAY_DAY} {formatMonthLabel(cycle)}
+          </h2>
+          <AllocationList items={budgetItems} />
+        </Panel>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5 lg:gap-6">
         <Panel className="lg:col-span-3">

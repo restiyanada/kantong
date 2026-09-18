@@ -9,6 +9,8 @@ export interface AllocationItem {
   color: string;
   icon?: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
   onClick?: () => void;
+  /** When set, the bar fills toward this budget limit instead of the row's share of the total, and turns red past it. */
+  limit?: number;
 }
 
 export function AllocationList({ items }: { items: AllocationItem[] }) {
@@ -24,8 +26,14 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
     <div className="space-y-4">
       {items.map((item) => {
         const Icon = item.icon;
+        const hasLimit = item.limit != null && item.limit > 0;
+        const overBudget = hasLimit && item.value > item.limit!;
         const pct = total > 0 ? (Math.max(item.value, 0) / total) * 100 : 0;
-        const barWidthPct = (Math.abs(item.value) / max) * 100;
+        const budgetPct = hasLimit ? (item.value / item.limit!) * 100 : 0;
+        const barWidthPct = hasLimit
+          ? Math.min(100, budgetPct)
+          : (Math.abs(item.value) / max) * 100;
+        const barColor = overBudget ? "#B23B3B" : item.color;
         const Wrapper = item.onClick ? "button" : "div";
         return (
           <Wrapper
@@ -53,11 +61,16 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
                 <span className="truncate text-sm font-medium text-[#1A1B1E]">{item.label}</span>
                 <span className="shrink-0 tabular-nums text-sm text-[#8A8C8E]">
                   {displayIDR(item.value, hidden)}
+                  {hasLimit && ` / ${displayIDR(item.limit!, hidden)}`}
                 </span>
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                <span className="tabular-nums text-sm font-semibold text-[#1A1B1E]">
-                  {pct.toFixed(2)}%
+                <span
+                  className={`tabular-nums text-sm font-semibold ${
+                    overBudget ? "text-[#B23B3B]" : "text-[#1A1B1E]"
+                  }`}
+                >
+                  {hasLimit ? Math.round(budgetPct) : pct.toFixed(2)}%
                 </span>
                 {item.onClick && <ChevronRight size={15} className="text-[#ADAFAF]" />}
               </div>
@@ -67,7 +80,7 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
                 className="h-full rounded-full transition-[width] duration-500 ease-out"
                 style={{
                   width: barWidthPct + "%",
-                  backgroundColor: item.color,
+                  backgroundColor: barColor,
                 }}
               />
             </div>

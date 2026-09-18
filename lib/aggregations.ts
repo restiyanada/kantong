@@ -1,4 +1,5 @@
 import { addDays, addMonths, daysBetween } from "./telegram/dateUtils";
+import { budgetCycleOf } from "./month";
 import type {
   DailyTransactionDecrypted,
   SavingsTransactionDecrypted,
@@ -77,6 +78,25 @@ export function computeCategoryBreakdown(
   return [...totals.entries()]
     .map(([category, total]) => ({ category, total }))
     .sort((a, b) => b.total - a.total);
+}
+
+/**
+ * Expense total per category within a pay cycle (see budgetCycleOf) instead
+ * of a calendar month — used only for Budgets, which are set per pay cycle,
+ * not per calendar month. Comparing a cycle-scoped limit against a
+ * calendar-month total would straddle two different paychecks' spending.
+ */
+export function computeCycleSpendByCategory(
+  transactions: Pick<DailyTransactionDecrypted, "date" | "type" | "amount" | "category" | "pending">[],
+  cycle: string,
+  cycleDay: number
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  for (const t of transactions) {
+    if (t.pending || t.type !== "expense" || budgetCycleOf(t.date, cycleDay) !== cycle) continue;
+    totals[t.category] = (totals[t.category] ?? 0) + t.amount;
+  }
+  return totals;
 }
 
 export interface MonthlyTotals {

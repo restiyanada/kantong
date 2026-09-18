@@ -18,3 +18,20 @@ export function formatMonthLabel(month: string): string {
   const date = new Date(Date.UTC(year, m - 1, 1));
   return date.toLocaleString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 }
+
+/** Payday — the single source of truth for where a budget cycle starts. */
+export const PAYDAY_DAY = 25;
+
+/**
+ * Which pay cycle a date belongs to, anchored to `cycleDay` (payday) instead
+ * of the calendar month — used only for Budgets, so a paycheck landing
+ * mid-month doesn't get split across two calendar-month buckets. Days
+ * before `cycleDay` belong to the previous month's cycle; the cycle is
+ * labeled like a calendar month (YYYY-MM) for storage/carry-forward, but
+ * spans cycleDay of that month through cycleDay-1 of the next.
+ */
+export function budgetCycleOf(dateISO: string, cycleDay: number): string {
+  const [year, month, day] = dateISO.split("-").map(Number);
+  const calendarMonth = `${year}-${String(month).padStart(2, "0")}`;
+  return day < cycleDay ? shiftMonth(calendarMonth, -1) : calendarMonth;
+}
