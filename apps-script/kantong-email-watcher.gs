@@ -95,7 +95,7 @@ function processThread(thread, apiUrl, apiSecret) {
     const payload = {
       from: message.getFrom(),
       subject: message.getSubject(),
-      body: message.getPlainBody(),
+      body: getMessageBody(message),
       messageId: message.getId(),
     };
 
@@ -133,6 +133,43 @@ function processThread(thread, apiUrl, apiSecret) {
   }
 
   return allOk;
+}
+
+// Some templates (seen from kartukreditbca@klikbca.com) ship a placeholder
+// text/plain alternative (e.g. a single "-") alongside the real HTML — all
+// the fields our parsers need only exist in the HTML in that case.
+// getPlainBody() returns that literal placeholder verbatim rather than
+// deriving text from the HTML, so anything from a template like that
+// otherwise always fails to parse. Fall back to a crude HTML-to-text
+// conversion whenever the plain body looks too short to be real content.
+const MIN_PLAUSIBLE_PLAIN_BODY_LENGTH = 50;
+
+function getMessageBody(message) {
+  const plain = message.getPlainBody();
+  if (plain.trim().length >= MIN_PLAUSIBLE_PLAIN_BODY_LENGTH) {
+    return plain;
+  }
+  return htmlToRoughText(message.getBody());
+}
+
+/**
+ * Crude HTML -> text: keeps every table row's cells on one line (joined by
+ * a space) so "Label : Value" pairs stay parseable, since our regexes
+ * expect that on a single line — only breaks lines at </tr>. Not a general
+ * HTML renderer, just enough for the simple label/colon/value tables these
+ * bank templates use.
+ */
+function htmlToRoughText(html) {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<\/tr>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .split("")
+    .map((line) => line.trim())
+    .join("\n")
+    .trim();
 }
 
 function getOrCreateProcessedLabel() {
