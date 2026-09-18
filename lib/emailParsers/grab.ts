@@ -8,6 +8,11 @@ import type { ParseResult } from "./types";
  * the same subject ("Your Grab E-Receipt"), so type is detected from body
  * text instead. Order matters: check the most specific keyword first.
  *
+ * Tip must be checked before GrabExpress — a tip given on an Express
+ * delivery still shows a "GrabExpress" banner in its receipt, so that
+ * generic keyword would otherwise shadow the much more specific tip
+ * sentence and mislabel the tip as a plain Express charge.
+ *
  * Car vs Bike is matched loosely on the header line under the receipt title
  * (e.g. "GrabCar Priority (BETA)", "Bike Standard") — service tier
  * (Priority/Saver/Protect/etc) is ignored, only the Car/Bike keyword matters.
@@ -16,8 +21,8 @@ type GrabType = "express" | "tip" | "food" | "car" | "bike";
 
 function detectGrabType(subject: string, body: string): GrabType {
   const text = `${subject}\n${body}`;
-  if (/GrabExpress/i.test(text)) return "express";
   if (/Tip\s+darimu\s+sudah\s+disalurkan/i.test(text)) return "tip";
+  if (/GrabExpress/i.test(text)) return "express";
   if (
     /GrabFood|Selamat\s+menikmati\s+makanan|Dine-in\s+Voucher|Hope\s+you\s+enjoyed\s+your\s+food/i.test(
       text
