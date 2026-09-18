@@ -153,21 +153,23 @@ function getMessageBody(message) {
 }
 
 /**
- * Crude HTML -> text: keeps every table row's cells on one line (joined by
- * a space) so "Label : Value" pairs stay parseable, since our regexes
- * expect that on a single line — only breaks lines at </tr>. Not a general
- * HTML renderer, just enough for the simple label/colon/value tables these
- * bank templates use.
+ * Crude HTML -> text: keeps every table row's cells, and every stacked
+ * <div> block, on one line so "Label : Value" pairs and "Label\nValue"
+ * div stacks both stay parseable on a single line like our regexes
+ * expect — only breaks lines at </tr> and </div>. Not a general HTML
+ * renderer, just enough for the simple label/value layouts these
+ * bank/Grab templates use.
  */
 function htmlToRoughText(html) {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<\/tr>/gi, "")
+    .replace(/<\/(tr|div)>/gi, "")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/\s+/g, " ")
     .split("")
     .map((line) => line.trim())
+    .filter((line) => line.length > 0)
     .join("\n")
     .trim();
 }

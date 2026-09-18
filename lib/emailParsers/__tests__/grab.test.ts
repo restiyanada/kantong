@@ -116,6 +116,29 @@ Diterbitkan untuk
 Resti
 `;
 
+// A tip given on a GrabExpress delivery still shows a "GrabExpress" banner
+// in its own receipt — regression test for the check-order bug where that
+// generic keyword shadowed the much more specific tip sentence below it.
+const EXPRESS_TIP_SUBJECT = "Your Grab E-Receipt";
+const EXPRESS_TIP_BODY = `
+GrabExpress Instant
+Terima kasih! Tip
+darimu sudah
+disalurkan ke
+pengemudimu.
+11 Sep 26 19:53 +0700
+Total RP 5000
+Tip
+Kode Booking: A-9QR8R3UGX9OEAV
+5000
+Total 5000
+100% diberikan untuk pengemudimu.
+Diterbitkan oleh pengemudi
+MOCHAMAD ADI DHARMA NUGROHO
+Diterbitkan untuk
+Resti
+`;
+
 const EXPRESS_SUBJECT = "Struk GrabExpress-mu";
 const EXPRESS_BODY = `
 Barangmu sudah dikirim!
@@ -193,6 +216,13 @@ describe("parseGrab", () => {
     expect(result.category).toBe("Other");
     expect(result.note).toBe("Tip - WAHYU HIDAYAT");
     expect(result.pending).toBe(false);
+  });
+
+  it("classifies a tip on a GrabExpress delivery as a tip, not shadowed by the GrabExpress banner text", () => {
+    const result = parseGrab(EXPRESS_TIP_SUBJECT, EXPRESS_TIP_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.category).toBe("Other");
+    expect(result.note).toBe("Tip - MOCHAMAD ADI DHARMA NUGROHO");
   });
 
   it("classifies GrabExpress as Other, using only the top total not the Faktur PPN sub-amounts", () => {
