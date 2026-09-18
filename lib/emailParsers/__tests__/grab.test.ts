@@ -225,6 +225,34 @@ describe("parseGrab", () => {
     expect(result.note).toBe("Tip - MOCHAMAD ADI DHARMA NUGROHO");
   });
 
+  it.each([
+    ["GrabCar Priority (BETA)", "BUDI SANTOSO"],
+    ["GrabFood", "SITI AMINAH"],
+  ])(
+    "classifies a tip on any service (%s) as a tip, not shadowed by that service's own banner text",
+    (serviceBanner, driver) => {
+      const body = `
+${serviceBanner}
+Terima kasih! Tip
+darimu sudah
+disalurkan ke
+pengemudimu.
+11 Sep 26 19:53 +0700
+Total RP 3000
+Tip
+Kode Booking: A-9GENERICTIPXXX
+Diterbitkan oleh pengemudi
+${driver}
+Diterbitkan untuk
+Resti
+`;
+      const result = parseGrab("Your Grab E-Receipt", body);
+      if (!result || isSkip(result)) throw new Error("expected a transaction");
+      expect(result.category).toBe("Other");
+      expect(result.note).toBe(`Tip - ${driver}`);
+    }
+  );
+
   it("classifies GrabExpress as Other, using only the top total not the Faktur PPN sub-amounts", () => {
     const result = parseGrab(EXPRESS_SUBJECT, EXPRESS_BODY);
     if (!result || isSkip(result)) throw new Error("expected a transaction");
