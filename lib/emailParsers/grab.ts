@@ -8,20 +8,21 @@ import type { ParseResult } from "./types";
  * the same subject ("Your Grab E-Receipt"), so type is detected from body
  * text instead. Order matters: check the most specific keyword first.
  *
- * Tip must be checked before GrabExpress — a tip given on an Express
- * delivery still shows a "GrabExpress" banner in its receipt, so that
- * generic keyword would otherwise shadow the much more specific tip
+ * Tip and Subscription must be checked before GrabExpress — a tip given on
+ * an Express delivery still shows a "GrabExpress" banner in its receipt, so
+ * that generic keyword would otherwise shadow the much more specific tip
  * sentence and mislabel the tip as a plain Express charge.
  *
  * Car vs Bike is matched loosely on the header line under the receipt title
  * (e.g. "GrabCar Priority (BETA)", "Bike Standard") — service tier
  * (Priority/Saver/Protect/etc) is ignored, only the Car/Bike keyword matters.
  */
-type GrabType = "express" | "tip" | "food" | "car" | "bike";
+type GrabType = "express" | "tip" | "subscription" | "food" | "car" | "bike";
 
 function detectGrabType(subject: string, body: string): GrabType {
   const text = `${subject}\n${body}`;
   if (/Tip\s+darimu\s+sudah\s+disalurkan/i.test(text)) return "tip";
+  if (/plan has been renewed/i.test(text)) return "subscription";
   if (/GrabExpress/i.test(text)) return "express";
   if (
     /GrabFood|Selamat\s+menikmati\s+makanan|Dine-in\s+Voucher|Hope\s+you\s+enjoyed\s+your\s+food/i.test(
@@ -35,16 +36,25 @@ function detectGrabType(subject: string, body: string): GrabType {
 
 /**
  * The hero total appears near the top of every Grab email as either
- * "Total Paid RP 13.000" (ride/car) or "TOTAL\nIDR 1950" / "TOTAL\nRp 46100"
- * (food/express/tip). Later in the same email, Faktur PPN (tax invoice)
- * sections repeat sub-amounts under labels like "Total Diskon" — since
- * regex.exec takes the leftmost match and the hero total always appears
- * first in the body, those nested amounts are never picked up.
+ * "Total Paid RP 13.000" (ride/car), "TOTAL\nIDR 1950" / "TOTAL\nRp 46100"
+ * (food/express/tip), or "Amount paid IDR 7.000" (subscription renewal).
+ * Later in the same email, Faktur PPN (tax invoice) sections repeat
+ * sub-amounts under labels like "Total Diskon" — since regex.exec takes the
+ * leftmost match and the hero total always appears first in the body,
+ * those nested amounts are never picked up.
  */
 function extractTotal(body: string): number | null {
   const match =
-    /Total(?:\s+Paid)?\s*[:\s]*\s*(?:RP|Rp|IDR)?\.?\s*([\d.,]+)/i.exec(body);
+    /(?:Total(?:\s+Paid)?|Amount\s+paid)\s*[:\s]*\s*(?:RP|Rp|IDR)?\.?\s*([\d.,]+)/i.exec(
+      body
+    );
   return match ? normalizeIDRAmount(match[1]) : null;
+}
+
+/** Plan name from the "Subscription <name>" line (subscription renewals only). */
+function extractSubscriptionName(body: string): string | null {
+  const match = /Subscription\s+([^\n]+)/.exec(body);
+  return match ? decodeHtmlEntities(match[1].trim()) : null;
 }
 
 function extractDriverName(body: string): string | null {
@@ -86,7 +96,9 @@ export function parseGrab(subject: string, body: string): ParseResult {
   if (!date) return null;
 
   const referenceMatch =
-    /(?:Booking ID|Kode Booking|Pesanan ID)\s*:?\s*\n?\s*(\S+)/.exec(body);
+    /(?:Booking ID|Kode Booking|Pesanan ID|Transaction ID)\s*:?\s*\n?\s*(\S+)/.exec(
+      body
+    );
   const referenceId = referenceMatch?.[1];
 
   const type = detectGrabType(subject, body);
@@ -108,6 +120,17 @@ export function parseGrab(subject: string, body: string): ParseResult {
         category: "Other",
         pending: false,
         note: driver ? `Tip - ${driver}` : "Grab Tip",
+        date,
+        referenceId,
+      };
+    }
+    case "subscription": {
+      const name = extractSubscriptionName(body);
+      return {
+        amount,
+        category: "Other",
+        pending: false,
+        note: name ? `Subscription - ${name}` : "Grab Subscription",
         date,
         referenceId,
       };
