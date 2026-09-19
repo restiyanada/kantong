@@ -139,6 +139,20 @@ Diterbitkan untuk
 Resti
 `;
 
+const SUBSCRIPTION_SUBJECT = "Your PaHe: Paket Hemat plan has been renewed";
+const SUBSCRIPTION_BODY = `
+Hey Resti,
+
+Great news! You're all set to keep enjoying savings with PaHe: Paket Hemat -
+your plan has been renewed smoothly.
+
+Subscription PaHe: Paket Hemat
+Renewed on 19 Sep 2026
+Amount paid IDR 7.000
+Paid by Visa 3702
+Transaction ID 144da58cae8f40358d425f1a10924230
+`;
+
 const EXPRESS_SUBJECT = "Struk GrabExpress-mu";
 const EXPRESS_BODY = `
 Barangmu sudah dikirim!
@@ -252,6 +266,16 @@ Resti
       expect(result.note).toBe(`Tip - ${driver}`);
     }
   );
+
+  it("classifies a subscription renewal as Other, reading 'Amount paid' since there's no 'Total' field", () => {
+    const result = parseGrab(SUBSCRIPTION_SUBJECT, SUBSCRIPTION_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(7000);
+    expect(result.date).toBe("2026-09-19");
+    expect(result.category).toBe("Other");
+    expect(result.note).toBe("Subscription - PaHe: Paket Hemat");
+    expect(result.referenceId).toBe("144da58cae8f40358d425f1a10924230");
+  });
 
   it("classifies GrabExpress as Other, using only the top total not the Faktur PPN sub-amounts", () => {
     const result = parseGrab(EXPRESS_SUBJECT, EXPRESS_BODY);
