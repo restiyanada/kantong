@@ -116,6 +116,31 @@ Diterbitkan untuk
 Resti
 `;
 
+// Grab sends tip receipts in English too — different wording entirely, not
+// just a translated version of the Indonesian sentence.
+const ENGLISH_TIP_SUBJECT = "Your Grab E-Receipt";
+const ENGLISH_TIP_BODY = `
+GrabBike
+Thanks! Your tip
+goes a long way for
+your driver.
+21 Sep 26 05:02 +0700
+Total Paid Rp2.000
+Tip 2.000
+From: Jl. Kp Bojong Awi Kaler No.52, Cisaranten Bina Harapan, Arcamanik, Kota
+Bandung, Jawa Barat, Indonesia, 40294
+To: Jl. Dipati Ukur No.53, Lebak Gede, Coblong, Kota Bandung, Jawa Barat, Indonesia,
+40132
+Date: 21 Sep 26 05:02 +0700
+Booking ID: A-9SXTTA3WWUJCAV
+Total Paid 2.000
+100% goes to your driver.
+Issued by driver
+Marsadi .
+Issued to
+Resti
+`;
+
 // A tip given on a GrabExpress delivery still shows a "GrabExpress" banner
 // in its own receipt — regression test for the check-order bug where that
 // generic keyword shadowed the much more specific tip sentence below it.
@@ -230,6 +255,15 @@ describe("parseGrab", () => {
     expect(result.category).toBe("Other");
     expect(result.note).toBe("Tip - WAHYU HIDAYAT");
     expect(result.pending).toBe(false);
+  });
+
+  it("classifies an English-language tip receipt as a tip, not a plain Grab Bike ride", () => {
+    const result = parseGrab(ENGLISH_TIP_SUBJECT, ENGLISH_TIP_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(2000);
+    expect(result.date).toBe("2026-09-21");
+    expect(result.category).toBe("Other");
+    expect(result.note).toBe("Tip - Marsadi .");
   });
 
   it("classifies a tip on a GrabExpress delivery as a tip, not shadowed by the GrabExpress banner text", () => {

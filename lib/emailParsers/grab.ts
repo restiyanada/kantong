@@ -21,7 +21,12 @@ type GrabType = "express" | "tip" | "subscription" | "food" | "car" | "bike";
 
 function detectGrabType(subject: string, body: string): GrabType {
   const text = `${subject}\n${body}`;
-  if (/Tip\s+darimu\s+sudah\s+disalurkan/i.test(text)) return "tip";
+  if (
+    /Tip\s+darimu\s+sudah\s+disalurkan|Your\s+tip\s+goes\s+a\s+long\s+way/i.test(
+      text
+    )
+  )
+    return "tip";
   if (/plan has been renewed/i.test(text)) return "subscription";
   if (/GrabExpress/i.test(text)) return "express";
   if (
@@ -58,7 +63,9 @@ function extractSubscriptionName(body: string): string | null {
 }
 
 function extractDriverName(body: string): string | null {
-  const match = /Diterbitkan oleh pengemudi\s+([^\n]+)/.exec(body);
+  const match = /(?:Diterbitkan oleh pengemudi|Issued by driver)\s+([^\n]+)/.exec(
+    body
+  );
   return match ? decodeHtmlEntities(match[1].trim()) : null;
 }
 
