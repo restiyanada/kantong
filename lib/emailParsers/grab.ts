@@ -17,7 +17,14 @@ import type { ParseResult } from "./types";
  * (e.g. "GrabCar Priority (BETA)", "Bike Standard") — service tier
  * (Priority/Saver/Protect/etc) is ignored, only the Car/Bike keyword matters.
  */
-type GrabType = "express" | "tip" | "subscription" | "food" | "car" | "bike";
+type GrabType =
+  | "express"
+  | "tip"
+  | "subscription"
+  | "food"
+  | "mart"
+  | "car"
+  | "bike";
 
 function detectGrabType(subject: string, body: string): GrabType {
   const text = `${subject}\n${body}`;
@@ -35,6 +42,7 @@ function detectGrabType(subject: string, body: string): GrabType {
     )
   )
     return "food";
+  if (/GrabMart/i.test(text)) return "mart";
   if (/GrabCar/i.test(text)) return "car";
   return "bike"; // Bike Standard / other 2-wheeler ride types
 }
@@ -42,15 +50,17 @@ function detectGrabType(subject: string, body: string): GrabType {
 /**
  * The hero total appears near the top of every Grab email as either
  * "Total Paid RP 13.000" (ride/car), "TOTAL\nIDR 1950" / "TOTAL\nRp 46100"
- * (food/express/tip), or "Amount paid IDR 7.000" (subscription renewal).
- * Later in the same email, Faktur PPN (tax invoice) sections repeat
- * sub-amounts under labels like "Total Diskon" — since regex.exec takes the
- * leftmost match and the hero total always appears first in the body,
- * those nested amounts are never picked up.
+ * (food/express/tip), "Amount paid IDR 7.000" (subscription renewal), or
+ * "Total harga Rp 60800" (GrabMart). Later in the same email, Faktur PPN
+ * (tax invoice) sections repeat sub-amounts under labels like "Total
+ * Diskon" — since regex.exec takes the leftmost match and the hero total
+ * always appears first in the body, those nested amounts are never picked
+ * up. The negative lookbehind keeps this from matching inside "Subtotal",
+ * which (for GrabMart) appears before the hero total.
  */
 function extractTotal(body: string): number | null {
   const match =
-    /(?:Total(?:\s+Paid)?|Amount\s+paid)\s*[:\s]*\s*(?:RP|Rp|IDR)?\.?\s*([\d.,]+)/i.exec(
+    /(?<!Sub)(?:Total\s+harga|Total(?:\s+Paid)?|Amount\s+paid)\s*[:\s]*\s*(?:RP|Rp|IDR)?\.?\s*([\d.,]+)/i.exec(
       body
     );
   return match ? normalizeIDRAmount(match[1]) : null;
@@ -72,6 +82,12 @@ function extractDriverName(body: string): string | null {
 /** Restaurant name from the "Pesanan Dari:" line (GrabFood receipts only). */
 function extractRestaurant(body: string): string | null {
   const match = /Pesanan Dari:\s*\n([^\n]+)/.exec(body);
+  return match ? decodeHtmlEntities(match[1].trim()) : null;
+}
+
+/** Store name from the "Dipesan dari:" line (GrabMart receipts only). */
+function extractMartStore(body: string): string | null {
+  const match = /Dipesan dari:\s*([^\n,]+)/.exec(body);
   return match ? decodeHtmlEntities(match[1].trim()) : null;
 }
 
@@ -103,7 +119,7 @@ export function parseGrab(subject: string, body: string): ParseResult {
   if (!date) return null;
 
   const referenceMatch =
-    /(?:Booking ID|Kode Booking|Pesanan ID|Transaction ID)\s*:?\s*\n?\s*(\S+)/.exec(
+    /(?:Booking ID|Kode Booking|Pesanan ID|Transaction ID|No\.\s*Order)\s*(?:\([^)]*\))?\s*:?\s*\n?\s*(\S+)/.exec(
       body
     );
   const referenceId = referenceMatch?.[1];
@@ -149,6 +165,17 @@ export function parseGrab(subject: string, body: string): ParseResult {
         category: "Food",
         pending: false,
         note: restaurant ? `Grab Food - ${restaurant}` : "GrabFood",
+        date,
+        referenceId,
+      };
+    }
+    case "mart": {
+      const store = extractMartStore(body);
+      return {
+        amount,
+        category: "Shopping",
+        pending: false,
+        note: store ? `GrabMart - ${store}` : "GrabMart",
         date,
         referenceId,
       };
