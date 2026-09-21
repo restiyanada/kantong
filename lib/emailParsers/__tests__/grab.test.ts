@@ -178,6 +178,32 @@ Paid by Visa 3702
 Transaction ID 144da58cae8f40358d425f1a10924230
 `;
 
+// Real GrabMart order — "Total harga" (not "Total Paid"/"TOTAL") sits before
+// a "Subtotal" line, which used to be matched by mistake since "Subtotal"
+// contains "total" as a substring. Also regression-tests the "No. Order"
+// reference label, which none of the other Grab receipts use.
+const MART_SUBJECT = "Your Grab E-Receipt";
+const MART_BODY = `
+Terima kasih sudah memesan dari kami!
+Total harga Rp 60800 Diantar pada 21 Sep 26 18:30 +0700
+Detail Pesanan
+Dipesan dengan: GrabMart
+Diantar oleh Donny Ramadhani
+Dipesan oleh Resti
+No. Order (Pesanan) A-9S48CCBWXDI7AV
+Dipesan dari: ALFAMIDI - RM HARSONO MH35 Alfamidi Rm Harsono, Jl. Harsono RM No.8 6, RT.6/RW.7, Ragunan, Pasar Minggu, Jakarta Selatan, 12550
+Diantar ke: fitara house kebagusan
+Ringkasan Pesanan
+Metode Pembayaran: Visa :   Rp 60800
+Pesananmu:
+1x   Alfamidi Handuk Travel 50x100cm   Rp 35900
+Subtotal   Rp 35900
+Ongkos kirim   Rp 16000
+Pengantaran Premium   Rp 7000
+Merchant service fee     Rp 1900
+Total (Including tax)       Rp 60800
+`;
+
 const EXPRESS_SUBJECT = "Struk GrabExpress-mu";
 const EXPRESS_BODY = `
 Barangmu sudah dikirim!
@@ -309,6 +335,17 @@ Resti
     expect(result.category).toBe("Other");
     expect(result.note).toBe("Subscription - PaHe: Paket Hemat");
     expect(result.referenceId).toBe("144da58cae8f40358d425f1a10924230");
+  });
+
+  it("classifies GrabMart as Shopping, reading the hero total not the Subtotal it contains as a substring", () => {
+    const result = parseGrab(MART_SUBJECT, MART_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(60800); // not 35900 (Subtotal) or 16000/7000/1900
+    expect(result.date).toBe("2026-09-21");
+    expect(result.category).toBe("Shopping");
+    expect(result.note).toBe("GrabMart - ALFAMIDI - RM HARSONO MH35 Alfamidi Rm Harsono");
+    expect(result.referenceId).toBe("A-9S48CCBWXDI7AV");
+    expect(result.pending).toBe(false);
   });
 
   it("classifies GrabExpress as Other, using only the top total not the Faktur PPN sub-amounts", () => {
