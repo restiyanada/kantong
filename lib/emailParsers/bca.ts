@@ -1,5 +1,5 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
-import { parseIndonesianAbbrevDate } from "./parseDate";
+import { parseIndonesianAbbrevDate, parseDashedDMYDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
 import { decodeHtmlEntities } from "./decodeEntities";
 import { getOwnNamePattern } from "./ownAccountConfig";
@@ -31,6 +31,17 @@ import type { ParseResult } from "./types";
  *     "Nama Penerima" matches the user's own name is a self-transfer
  *     between accounts and is skipped, same as Danamon's self-transfers.
  *
+ *  3. "Type Transaksi" field — a biller/prepaid purchase (e.g. PLN Prepaid
+ *     electricity tokens, phone credit) bought through myBCA directly,
+ *     rather than via QRIS/VA. Uses its own field names throughout
+ *     ("No. Referensi" not "Nomor Referensi", "Tgl/Jam" not "Tanggal
+ *     Transaksi", "Produk" as the merchant):
+ *       Type Transaksi : PEMBELIAN
+ *       Produk         : PLN PREPAID
+ *       Tgl/Jam        : 23/09/2026 19:08:37
+ *     Always logged as an expense — there's no top-up/self-transfer case
+ *     for a biller purchase.
+ *
  * Dates use Indonesian 3-letter month abbreviations (parseIndonesianAbbrevDate),
  * not English — "Mei"/"Agu"/"Okt"/"Des" differ from "May"/"Aug"/"Oct"/"Dec"
  * and would silently fail to parse under an English-only parser.
@@ -41,7 +52,7 @@ export function parseBCA(body: string): ParseResult {
     return { skip: true, reason: "transaction not successful" };
   }
 
-  const referenceMatch = /Nomor Referensi\s*:\s*(\S+)/.exec(body);
+  const referenceMatch = /(?:Nomor Referensi|No\.\s*Referensi)\s*:\s*(\S+)/.exec(body);
   const referenceId = referenceMatch?.[1];
 
   const jenisTransaksiMatch = /Jenis Transaksi\s*:\s*(.+)/.exec(body);
@@ -52,6 +63,11 @@ export function parseBCA(body: string): ParseResult {
   const jenisTransferMatch = /Jenis Transfer\s*:\s*(.+)/.exec(body);
   if (jenisTransferMatch) {
     return parseAccountTransfer(body, referenceId);
+  }
+
+  const typeTransaksiMatch = /Type Transaksi\s*:\s*(.+)/.exec(body);
+  if (typeTransaksiMatch) {
+    return parseBillerPurchase(body, referenceId);
   }
 
   return null; // neither known field present — genuinely unrecognized shape
@@ -104,6 +120,33 @@ function parsePembayaranOrVA(
   // (not an e-wallet top-up) instead only have "Nama Perusahaan/Produk".
   const merchantMatch = /Pembayaran Ke\s*:\s*(.+)/.exec(body);
   const merchant = merchantMatch ? decodeHtmlEntities(merchantMatch[1].trim()) : product || "BCA";
+
+  const category = categorizeMerchant(merchant);
+
+  return {
+    amount,
+    category: category ?? "Other",
+    pending: category === null,
+    note: merchant,
+    date,
+    referenceId,
+  };
+}
+
+function parseBillerPurchase(
+  body: string,
+  referenceId: string | undefined
+): ParseResult {
+  const amountMatch = /Total Bayar\s*:\s*(?:RP|IDR)?\.?\s*([\d.,]+)/i.exec(body);
+  const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
+  if (!amount) return null;
+
+  const dateMatch = /Tgl\/Jam\s*:\s*(\d{2}\/\d{2}\/\d{4})/.exec(body);
+  const date = dateMatch ? parseDashedDMYDate(dateMatch[1]) : null;
+  if (!date) return null;
+
+  const productMatch = /Produk\s*:\s*(.+)/.exec(body);
+  const merchant = productMatch ? decodeHtmlEntities(productMatch[1].trim()) : "BCA";
 
   const category = categorizeMerchant(merchant);
 
