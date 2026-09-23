@@ -70,9 +70,9 @@ export function parseIndonesianDate(text: string): string | null {
   return `${year}-${month}-${day.padStart(2, "0")}`;
 }
 
-/** "15-06-2026" (DD-MM-YYYY) -> "2026-06-15" (DBS). */
+/** "15-06-2026" or "15/06/2026" (DD-MM-YYYY) -> "2026-06-15" (DBS, BCA). */
 export function parseDashedDMYDate(text: string): string | null {
-  const match = /(\d{2})-(\d{2})-(\d{4})/.exec(text);
+  const match = /(\d{2})[-/](\d{2})[-/](\d{4})/.exec(text);
   if (!match) return null;
   const [, day, month, year] = match;
   return `${year}-${month}-${day}`;

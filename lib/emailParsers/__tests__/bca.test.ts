@@ -70,6 +70,24 @@ Nominal Tujuan : IDR 500,000.00
 Nomor Referensi : SOME-REF-ID
 `;
 
+// Real sample: a PLN Prepaid electricity purchase — a third myBCA email
+// shape with its own field names ("Type Transaksi" not "Jenis Transaksi",
+// "No. Referensi" not "Nomor Referensi", "Tgl/Jam" not "Tanggal Transaksi"),
+// previously unrecognized entirely and silently dropped (returned null).
+const PLN_PREPAID_BODY = `
+Sumber Dana : 2831****68
+No. Referensi : 9527120260923190837641TPP53699
+Bank Ref : 092342596813
+Pengirim : BCA
+Tgl/Jam : 23/09/2026 19:08:37
+Type Transaksi : PEMBELIAN
+Produk : PLN PREPAID
+Nama Pelanggan : ISMAIL DAWALLANG 12
+No Pelanggan : 547401915804
+Total Bayar : RP 103.000
+Status : Berhasil
+`;
+
 const CC_BILL_PAYMENT_BODY = `
 Status : Berhasil
 Tanggal Transaksi : 04 Jul 2026 19:06:08
@@ -128,6 +146,17 @@ describe("parseBCA", () => {
   it("skips a transfer where the recipient is the user themself", () => {
     const result = parseBCA(SELF_TRANSFER_BODY);
     expect(isSkip(result)).toBe(true);
+  });
+
+  it("parses a PLN Prepaid biller purchase (Type Transaksi shape, RP not IDR, slash date)", () => {
+    const result = parseBCA(PLN_PREPAID_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(103000);
+    expect(result.date).toBe("2026-09-23");
+    expect(result.note).toBe("PLN PREPAID");
+    expect(result.category).toBe("Bills");
+    expect(result.referenceId).toBe("9527120260923190837641TPP53699");
+    expect(result.pending).toBe(false);
   });
 
   it("skips a credit card bill payment — settling a bill isn't new spending", () => {
