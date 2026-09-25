@@ -1,15 +1,21 @@
 import { listPendingDailyTransactions } from "./db/dailyTransactions";
 import { sendMessage } from "./telegram/telegramApi";
 import { buildCategoryKeyboard } from "./telegram/handleUpdate";
+import { getTodayISO } from "./telegram/dateUtils";
 import { formatIDR } from "./format";
 
 const MAX_SHOWN = 10; // PRD_Auto_Log_Bank_Emails.md section 9.2
 
+// Salary is never auto-logged (emails only carry expenses), so without a
+// nudge the Daily balance only ever goes down.
+const SALARY_REMINDER_DAYS = [23, 24, 25];
+
 export interface DigestResult {
   sent: number;
   overflow: number;
-  /** True on a "silent day" — no pending transactions, nothing sent. */
+  /** True on a "silent day" — no pending transactions to list. */
   skipped: boolean;
+  salaryReminder: boolean;
 }
 
 /**
@@ -22,15 +28,22 @@ export interface DigestResult {
  * per the "don't let anything silently fall through the cracks" decision —
  * a transaction keeps reappearing every night until it's actually resolved.
  */
-export async function sendDailyDigest(): Promise<DigestResult> {
+export async function sendDailyDigest(
+  todayISO: string = getTodayISO()
+): Promise<DigestResult> {
   const chatId = Number(process.env.TELEGRAM_CHAT_ID);
   if (!chatId) {
     throw new Error("TELEGRAM_CHAT_ID environment variable is not set");
   }
 
+  const salaryReminder = SALARY_REMINDER_DAYS.includes(Number(todayISO.slice(8, 10)));
+  if (salaryReminder) {
+    await sendMessage(chatId, "💰 Payday reminder — log your salary: +<amount> gaji");
+  }
+
   const pending = await listPendingDailyTransactions();
   if (pending.length === 0) {
-    return { sent: 0, overflow: 0, skipped: true }; // silent day
+    return { sent: 0, overflow: 0, skipped: true, salaryReminder }; // silent day
   }
 
   const toShow = pending.slice(0, MAX_SHOWN);
@@ -53,5 +66,5 @@ export async function sendDailyDigest(): Promise<DigestResult> {
     await sendMessage(chatId, `…and ${overflow} more on web app`);
   }
 
-  return { sent: toShow.length, overflow, skipped: false };
+  return { sent: toShow.length, overflow, skipped: false, salaryReminder };
 }
