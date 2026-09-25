@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Wallet, PiggyBank, Landmark } from "lucide-react";
 import {
+  computeDepositoTotal,
   computeNetWorth,
   computeNetWorthOverTime,
   filterByTimeRange,
@@ -58,8 +59,8 @@ export function AllView({
     [savings]
   );
   const depositoTotal = useMemo(
-    () => deposito.filter((c) => c.status !== "closed").reduce((sum, c) => sum + c.principal, 0),
-    [deposito]
+    () => computeDepositoTotal(deposito, todayISO),
+    [deposito, todayISO]
   );
 
   const breakdown = computeNetWorth(dailyBalance, savingsBalance, depositoTotal);

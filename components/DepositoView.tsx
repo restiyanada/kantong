@@ -19,7 +19,10 @@ export function DepositoView({
   onBack: () => void;
 }) {
   const { hidden } = useBalanceVisibility();
-  const total = useMemo(() => computeDepositoTotal(certificates), [certificates]);
+  const total = useMemo(
+    () => computeDepositoTotal(certificates, todayISO),
+    [certificates, todayISO]
+  );
   const sorted = useMemo(
     () => [...certificates].sort((a, b) => b.openedDate.localeCompare(a.openedDate)),
     [certificates]
