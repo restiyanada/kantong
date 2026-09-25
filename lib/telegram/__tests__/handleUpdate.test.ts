@@ -112,7 +112,7 @@ describe("handleUpdate — note prompt reply", () => {
         reply_to_message: {
           message_id: 49,
           chat: { id: CHAT_ID },
-          text: "✅ -Rp25,000 — Food\n✏️ Add a note? Reply to this message. (ref:daily-doc-1)",
+          text: "✅ -Rp25.000 — Food\n✏️ Add a note? Reply to this message. (ref:daily-doc-1)",
         },
       },
     });
@@ -166,7 +166,7 @@ describe("handleUpdate — Budget", () => {
     expect(setBudgetLimit).toHaveBeenCalledWith(expectedCycle, "Food", 2_000_000);
     const [, confirmation] = vi.mocked(sendMessage).mock.calls[0];
     expect(confirmation).toContain("Food");
-    expect(confirmation).toContain("Rp2,000,000");
+    expect(confirmation).toContain("Rp2.000.000");
   });
 
   it("reports an error for an unrecognized category or missing amount", async () => {

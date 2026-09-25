@@ -1,12 +1,13 @@
 "use client";
 
-import { Wallet, PiggyBank, LayoutGrid } from "lucide-react";
+import { Wallet, PiggyBank, LayoutGrid, Landmark } from "lucide-react";
 import type { ComponentType } from "react";
 
 const TABS: { key: PocketKey; label: string; icon: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
   { key: "all", label: "All", icon: LayoutGrid },
   { key: "daily", label: "Daily", icon: Wallet },
   { key: "savings", label: "Savings", icon: PiggyBank },
+  { key: "deposito", label: "Deposito", icon: Landmark },
 ];
 
 export type PocketKey = "all" | "daily" | "savings" | "deposito";
@@ -33,13 +34,13 @@ export function PocketTabs({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(tab.key)}
-            className={`relative flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-200 sm:flex-none sm:px-4 ${
+            className={`relative flex flex-1 items-center justify-center gap-1 whitespace-nowrap sm:gap-1.5 rounded-full px-2.5 py-2 text-sm font-medium transition-all duration-200 sm:flex-none sm:px-4 ${
               isActive
                 ? "bg-[#1A1B1E] text-white shadow-sm"
                 : "text-[#6B6D70] hover:bg-[#F7F7F5] hover:text-[#1A1B1E]"
             }`}
           >
-            <Icon size={15} strokeWidth={isActive ? 2.25 : 2} />
+            <Icon size={14} strokeWidth={isActive ? 2.25 : 2} />
             {tab.label}
           </button>
         );

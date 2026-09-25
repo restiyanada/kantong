@@ -2,8 +2,13 @@ import { describe, it, expect } from "vitest";
 import { formatIDR, formatShortDate, formatMediumDate, formatDateWithDay } from "../format";
 
 describe("formatIDR", () => {
-  it("formats as Rp with thousand separators", () => {
-    expect(formatIDR(1_000_000)).toBe("Rp1,000,000");
+  it("formats as Rp with Indonesian dot thousand separators", () => {
+    expect(formatIDR(1_000_000)).toBe("Rp1.000.000");
+    expect(formatIDR(950)).toBe("Rp950");
+  });
+
+  it("puts the minus sign before Rp for negatives", () => {
+    expect(formatIDR(-24_071_324)).toBe("-Rp24.071.324");
   });
 });
 
