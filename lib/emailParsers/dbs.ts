@@ -2,8 +2,8 @@ import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseDashedDMYDate, parseIndonesianAbbrevDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
 import { decodeHtmlEntities } from "./decodeEntities";
-import { getOwnAccountAliases } from "./ownAccountConfig";
-import type { ParseResult } from "./types";
+import { getOwnAccountAliases, getDbsSavingsGoal } from "./ownAccountConfig";
+import type { ParseResult, DBSParseResult } from "./types";
 
 /**
  * DBS sends from two different addresses with different formats:
@@ -17,7 +17,12 @@ import type { ParseResult } from "./types";
  *       "digibank - Pembayaran QRIS Berhasil"        -> purchase, log it
  *       "digibank - Konfirmasi transfer ke rekening DBS kamu"
  *                                                      -> transfer to the
- *          user's OWN DBS account ("kamu" = "you") — always skipped
+ *          user's OWN DBS account ("kamu" = "you"). Usually a no-op
+ *          shuffle between accounts and skipped — UNLESS the destination
+ *          account is one of the user's named savings sub-accounts
+ *          (DBS_SAVINGS_ACCOUNTS, e.g. a "Bayar Kosan" rent fund), in
+ *          which case it's a deliberate deposit and gets logged as a
+ *          Savings transaction instead.
  *       "digibank – Transfer Ke Rekening Bank Lain Berhasil"
  *                                                      -> transfer to a
  *          DIFFERENT (non-DBS) bank account. No recipient name is given,
@@ -28,12 +33,12 @@ import type { ParseResult } from "./types";
  *          Otherwise it's logged as a real expense (money genuinely left
  *          the user's DBS account to someone else's account).
  */
-export function parseDBS(subject: string, body: string): ParseResult {
+export function parseDBS(subject: string, body: string): DBSParseResult {
   const sentenceResult = parseOldSentenceFormat(body);
   if (sentenceResult) return sentenceResult;
 
   if (/rekening dbs kamu/i.test(subject)) {
-    return { skip: true, reason: "self-transfer, not an expense" };
+    return parseOwnAccountTransfer(body);
   }
   if (/rekening bank lain/i.test(subject)) {
     return parseTransferToOtherBank(body);
@@ -68,6 +73,37 @@ function parseOldSentenceFormat(body: string): ParseResult {
     category: category ?? "Other",
     pending: category === null,
     note: merchant,
+    date,
+  };
+}
+
+/**
+ * "Kamu telah berhasil melakukan transfer sebesar Rp 3000000 ke rekening
+ * yang berakhiran 6483 pada 25-Sep-2026." A transfer to the user's own DBS
+ * account is usually a no-op shuffle, but if the destination is one of
+ * their named savings sub-accounts (DBS_SAVINGS_ACCOUNTS), it's a real
+ * deposit into that goal and should be tracked, not silently dropped.
+ */
+function parseOwnAccountTransfer(body: string): DBSParseResult {
+  const destMatch = /berakhiran\s*(\d{3,})/i.exec(body);
+  const goal = destMatch ? getDbsSavingsGoal(destMatch[1]) : null;
+  if (!goal) {
+    return { skip: true, reason: "self-transfer, not an expense" };
+  }
+
+  const amountMatch = /transfer sebesar Rp\s*([\d.,]+)/i.exec(body);
+  const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
+  if (!amount) return null;
+
+  const dateMatch = /pada\s+(\d{1,2}[\s-]+[A-Za-z]+[\s-]+\d{2,4})/i.exec(body);
+  const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
+  if (!date) return null;
+
+  return {
+    savings: true,
+    amount,
+    goal,
+    note: "DBS transfer",
     date,
   };
 }

@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { parseDBS } from "../dbs";
-import { isSkip } from "../types";
+import { isSkip, isSavings } from "../types";
 
 beforeEach(() => {
   process.env.OWN_ACCOUNT_ALIASES = "uwi";
+  process.env.DBS_SAVINGS_ACCOUNTS = "6483:Bayar Kosan";
 });
 
 afterEach(() => {
   delete process.env.OWN_ACCOUNT_ALIASES;
+  delete process.env.DBS_SAVINGS_ACCOUNTS;
 });
 
 const SUBJECT_OLD = "DBS - Informasi Transaksi Anda";
@@ -49,7 +51,7 @@ pada 15-Jul-2026.
 describe("parseDBS", () => {
   it("parses the old sentence-format purchase (dbsindonesia@1bank.dbs.com)", () => {
     const result = parseDBS(SUBJECT_OLD, OLD_SENTENCE_BODY);
-    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
     expect(result.amount).toBe(79900);
     expect(result.date).toBe("2026-06-15");
     expect(result.note).toBe("SpotifyID");
@@ -59,7 +61,7 @@ describe("parseDBS", () => {
 
   it("parses the new digibank numbered-list QRIS purchase", () => {
     const result = parseDBS(SUBJECT_QRIS, DIGIBANK_QRIS_BODY);
-    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
     expect(result.amount).toBe(173800);
     expect(result.date).toBe("2026-07-16");
     expect(result.note).toBe("REMBOELAN CITOS");
@@ -72,7 +74,7 @@ describe("parseDBS", () => {
     const realBody =
       "Hai, RESTIYANA DWI ASTUTI,   Pembayaran QRIS pada tanggal 17 Jul 2026 sebesar Rp19900 di FMI PLAZA OLEOS berhasil. Berikut adalah rincian transaksinya:   1.Waktu Transaksi (tanggal & jam): 17 Jul 2026 & 08:46:13  2.Status Transaksi: SUCCESS  3.Nama Acquirer: PT Bank Central Asia  4.Nama Merchant: FMI PLAZA OLEOS  5.Lokasi Merchant: JAKARTA SELATID12550  6.Merchant PAN: 9360001430022454661  7.Terminal ID: A1BV9566  8.Customer PAN: 9360004610010547249  9.Reff ID: 20260717084607246651  10.Total Pembayaran: Rp19900  11.Tips Amount (jika ada): Rp0  12.Source Of Fund: 1706006653  13.Transaction Type: Pembayaran  14.RRN: 084613749783";
     const result = parseDBS(SUBJECT_QRIS, realBody);
-    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
     expect(result.amount).toBe(19900);
     expect(result.date).toBe("2026-07-17");
     // The bug: this used to capture the ENTIRE rest of the string instead
@@ -82,14 +84,27 @@ describe("parseDBS", () => {
     expect(result.pending).toBe(false);
   });
 
-  it("skips a transfer to the user's own DBS account", () => {
+  it("skips a transfer to the user's own DBS account (not a mapped savings account)", () => {
     const result = parseDBS(SUBJECT_SELF_TRANSFER, SELF_TRANSFER_BODY);
     expect(isSkip(result)).toBe(true);
   });
 
+  it("logs a transfer to a mapped savings sub-account as a Savings deposit instead of skipping it", () => {
+    const body = `
+Hai, RESTIYANA DWI ASTUTI,
+
+Kamu telah berhasil melakukan transfer sebesar Rp 3000000 ke rekening yang berakhiran 6483 pada 25-Sep-2026.
+`;
+    const result = parseDBS(SUBJECT_SELF_TRANSFER, body);
+    if (!result || !isSavings(result)) throw new Error("expected a savings deposit");
+    expect(result.amount).toBe(3000000);
+    expect(result.date).toBe("2026-09-25");
+    expect(result.goal).toBe("Bayar Kosan");
+  });
+
   it("logs a transfer to a different bank account as an expense (no name available, only masked account)", () => {
     const result = parseDBS(SUBJECT_OTHER_BANK, OTHER_BANK_TRANSFER_BODY);
-    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
     expect(result.amount).toBe(31000);
     expect(result.date).toBe("2026-07-15");
     expect(result.note).toBe("DBS transfer to ****4742");

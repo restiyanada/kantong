@@ -59,6 +59,8 @@ export interface SavingsTransaction {
   note: string;
   date: string; // YYYY-MM-DD
   createdAt: string; // ISO timestamp
+  /** Set only by the email pipeline — see DailyTransaction.sourceMessageId. */
+  sourceMessageId?: string;
 }
 
 export interface SavingsTransactionDecrypted

@@ -26,7 +26,32 @@ export type ParseResult =
   | null;
 
 export function isSkip(
-  result: ParseResult
+  result: ParseResult | ParsedSavingsDeposit
 ): result is { skip: true; reason: string } {
   return result !== null && "skip" in result;
+}
+
+/**
+ * A deposit into a named Savings goal — a fourth outcome, distinct from
+ * ParseResult's three, that only DBS's "transfer to your own account" email
+ * can produce (e.g. a monthly rent fund transfer, not a no-op shuffle). Kept
+ * out of the shared ParseResult union so every other parser's return type
+ * (and their tests' `isSkip` narrowing) doesn't have to account for a case
+ * that can never actually happen there.
+ */
+export interface ParsedSavingsDeposit {
+  savings: true;
+  amount: number;
+  goal: string;
+  note: string;
+  date: string; // YYYY-MM-DD
+  referenceId?: string;
+}
+
+export type DBSParseResult = ParseResult | ParsedSavingsDeposit;
+
+export function isSavings(
+  result: DBSParseResult
+): result is ParsedSavingsDeposit {
+  return result !== null && "savings" in result;
 }
