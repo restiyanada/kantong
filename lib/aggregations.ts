@@ -187,12 +187,18 @@ export function computeSavingsBalance(
 
 // ---- Deposito ---------------------------------------------------------------
 
-/** Total value of certificates that haven't been closed/withdrawn yet. */
+/**
+ * Total value of certificates still locked in a term. A matured certificate
+ * stops counting on its maturity date even before it's marked closed — by
+ * then the money has either come back out or rolled into a new certificate,
+ * which is logged separately.
+ */
 export function computeDepositoTotal(
-  certificates: Pick<DepositoCertificateDecrypted, "principal" | "status">[]
+  certificates: Pick<DepositoCertificateDecrypted, "principal" | "status" | "maturityDate">[],
+  todayISO: string
 ): number {
   return certificates
-    .filter((c) => c.status !== "closed")
+    .filter((c) => c.status !== "closed" && c.maturityDate > todayISO)
     .reduce((sum, c) => sum + c.principal, 0);
 }
 
@@ -262,7 +268,7 @@ export function computeNetWorthOverTime(
   savingsTransactions: Pick<SavingsTransactionDecrypted, "date" | "direction" | "amount">[],
   certificates: Pick<
     DepositoCertificateDecrypted,
-    "openedDate" | "closedDate" | "principal" | "status"
+    "openedDate" | "closedDate" | "maturityDate" | "principal" | "status"
   >[],
   todayISO: string
 ): NetWorthPoint[] {
@@ -272,6 +278,7 @@ export function computeNetWorthOverTime(
   for (const c of certificates) {
     eventDates.add(c.openedDate);
     if (c.closedDate) eventDates.add(c.closedDate);
+    if (c.maturityDate <= todayISO) eventDates.add(c.maturityDate);
   }
   eventDates.add(todayISO);
 
@@ -298,7 +305,8 @@ export function computeNetWorthOverTime(
 
     const depositoValue = certificates.reduce((sum, c) => {
       const isOpenByThen = c.openedDate <= date;
-      const isStillActive = !c.closedDate || c.closedDate >= date;
+      const isStillActive =
+        (!c.closedDate || c.closedDate >= date) && date < c.maturityDate;
       return isOpenByThen && isStillActive ? sum + c.principal : sum;
     }, 0);
 

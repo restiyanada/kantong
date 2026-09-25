@@ -12,6 +12,7 @@ import {
   computeDepositoTotal,
   depositoBadge,
   computeNetWorth,
+  computeNetWorthOverTime,
 } from "../aggregations";
 import type { DailyTransactionDecrypted, DepositoCertificateDecrypted } from "@/types";
 
@@ -233,13 +234,45 @@ describe("computeSavingsBalance", () => {
 });
 
 describe("computeDepositoTotal", () => {
-  it("excludes closed certificates", () => {
-    const certs: Pick<DepositoCertificateDecrypted, "principal" | "status">[] = [
-      { principal: 20_000_000, status: "active" },
-      { principal: 10_000_000, status: "matured" },
-      { principal: 5_000_000, status: "closed" },
+  const today = "2026-09-25";
+
+  it("counts only certificates still in their term — not closed, not past maturity", () => {
+    const certs: Pick<DepositoCertificateDecrypted, "principal" | "status" | "maturityDate">[] = [
+      { principal: 35_322_000, status: "active", maturityDate: "2026-09-27" },
+      { principal: 5_000_000, status: "closed", maturityDate: "2026-12-01" },
     ];
-    expect(computeDepositoTotal(certs)).toBe(30_000_000);
+    expect(computeDepositoTotal(certs, today)).toBe(35_322_000);
+  });
+
+  it("stops counting a certificate on its maturity date even if never closed", () => {
+    const certs: Pick<DepositoCertificateDecrypted, "principal" | "status" | "maturityDate">[] = [
+      { principal: 40_368_000, status: "active", maturityDate: "2026-09-25" },
+      { principal: 1_000_000, status: "active", maturityDate: "2026-09-20" },
+    ];
+    expect(computeDepositoTotal(certs, today)).toBe(0);
+  });
+});
+
+describe("computeNetWorthOverTime", () => {
+  it("drops a certificate from the deposito line on its maturity date", () => {
+    const points = computeNetWorthOverTime(
+      [],
+      [],
+      [
+        {
+          openedDate: "2026-06-25",
+          maturityDate: "2026-09-25",
+          principal: 40_368_000,
+          status: "active",
+        },
+      ],
+      "2026-09-26"
+    );
+    expect(points.map((p) => [p.date, p.deposito])).toEqual([
+      ["2026-06-25", 40_368_000],
+      ["2026-09-25", 0],
+      ["2026-09-26", 0],
+    ]);
   });
 });
 
