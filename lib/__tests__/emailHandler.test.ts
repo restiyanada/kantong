@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../db/dailyTransactions", () => ({
   createDailyTransaction: vi.fn(async () => "daily-doc-1"),
   dailyTransactionExistsForMessage: vi.fn(async () => false),
+}));
+
+vi.mock("../db/savingsTransactions", () => ({
+  createSavingsTransaction: vi.fn(async () => "savings-doc-1"),
+  savingsTransactionExistsForMessage: vi.fn(async () => false),
 }));
 
 vi.mock("../db/emailFailures", () => ({
@@ -15,6 +20,10 @@ import {
   createDailyTransaction,
   dailyTransactionExistsForMessage,
 } from "../db/dailyTransactions";
+import {
+  createSavingsTransaction,
+  savingsTransactionExistsForMessage,
+} from "../db/savingsTransactions";
 import { alreadyNotifiedFailure, recordFailureNotified } from "../db/emailFailures";
 
 const BCA_BODY = `
@@ -33,8 +42,19 @@ Nama Penerima Restiyana Dwi Astuti
 Nominal Transaksi Rp50.000,00
 `;
 
+const DBS_SAVINGS_TRANSFER_BODY = `
+Hai, RESTIYANA DWI ASTUTI,
+
+Kamu telah berhasil melakukan transfer sebesar Rp 3000000 ke rekening yang berakhiran 6483 pada 25-Sep-2026.
+`;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.DBS_SAVINGS_ACCOUNTS = "6483:Bayar Kosan";
+});
+
+afterEach(() => {
+  delete process.env.DBS_SAVINGS_ACCOUNTS;
 });
 
 describe("handleIncomingEmail", () => {
@@ -79,6 +99,68 @@ describe("handleIncomingEmail", () => {
       reason: "duplicate (already logged)",
       notify: false,
     });
+    expect(createDailyTransaction).not.toHaveBeenCalled();
+  });
+
+  it("logs a DBS transfer to a mapped savings account as a Savings deposit, not an expense", async () => {
+    const outcome = await handleIncomingEmail({
+      from: "digibank <digibankid@dbs.com>",
+      subject: "digibank - Konfirmasi transfer ke rekening DBS kamu",
+      body: DBS_SAVINGS_TRANSFER_BODY,
+      messageId: "gmail-msg-savings",
+    });
+
+    expect(outcome).toEqual({
+      logged: true,
+      category: "Bayar Kosan",
+      amount: 3000000,
+      note: "DBS transfer",
+      pending: false,
+    });
+    expect(createSavingsTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: "in",
+        amount: 3000000,
+        goal: "Bayar Kosan",
+        sourceMessageId: "gmail-msg-savings",
+      })
+    );
+    expect(createDailyTransaction).not.toHaveBeenCalled();
+  });
+
+  it("skips a duplicate DBS savings deposit without writing anything", async () => {
+    vi.mocked(savingsTransactionExistsForMessage).mockResolvedValueOnce(true);
+
+    const outcome = await handleIncomingEmail({
+      from: "digibank <digibankid@dbs.com>",
+      subject: "digibank - Konfirmasi transfer ke rekening DBS kamu",
+      body: DBS_SAVINGS_TRANSFER_BODY,
+      messageId: "gmail-msg-savings",
+    });
+
+    expect(outcome).toEqual({
+      logged: false,
+      reason: "duplicate (already logged)",
+      notify: false,
+    });
+    expect(createSavingsTransaction).not.toHaveBeenCalled();
+  });
+
+  it("still skips a DBS self-transfer to an unmapped account", async () => {
+    const body = `
+Hai, RESTIYANA DWI ASTUTI,
+
+Kamu telah berhasil melakukan transfer sebesar Rp 1000000 ke rekening yang berakhiran 6653 pada 25-Sep-2026.
+`;
+    const outcome = await handleIncomingEmail({
+      from: "digibank <digibankid@dbs.com>",
+      subject: "digibank - Konfirmasi transfer ke rekening DBS kamu",
+      body,
+      messageId: "gmail-msg-4",
+    });
+
+    expect(outcome.logged).toBe(false);
+    expect(createSavingsTransaction).not.toHaveBeenCalled();
     expect(createDailyTransaction).not.toHaveBeenCalled();
   });
 
