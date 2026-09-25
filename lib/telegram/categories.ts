@@ -42,6 +42,13 @@ export const SAVINGS_GOAL_KEYWORDS: Record<string, string> = {
   darurat: "Emergency",
   general: "General",
   umum: "General",
+  // Match the exact goal names DBS_SAVINGS_ACCOUNTS uses for auto-logged
+  // deposits, so a manual reconciliation entry lands in the same bucket
+  // instead of splitting into a separate "General" one.
+  nabung: "Nabung",
+  kosan: "Bayar Kosan",
+  kost: "Bayar Kosan",
+  kuliah: "Kuliah",
 };
 
 export const SAVINGS_DEFAULT_GOAL = "General";

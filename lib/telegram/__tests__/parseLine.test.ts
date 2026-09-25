@@ -90,6 +90,20 @@ describe("Savings pocket (5.3)", () => {
     });
   });
 
+  // These match the exact goal names DBS_SAVINGS_ACCOUNTS produces for
+  // auto-logged deposits, so a manual reconciliation entry lands in the
+  // same bucket instead of splitting into "General".
+  it("matches the DBS sub-account goal keywords (kosan -> Bayar Kosan)", () => {
+    const result = parseLine("nabung +200000 kosan reconcile", TODAY);
+    expect(result).toMatchObject({
+      kind: "savings",
+      direction: "in",
+      amount: 200000,
+      goal: "Bayar Kosan",
+      note: "reconcile",
+    });
+  });
+
   it("errors when the amount has no sign", () => {
     const result = parseLine("nabung 500000 no sign", TODAY);
     expect(result.kind).toBe("error");
