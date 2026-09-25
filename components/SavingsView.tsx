@@ -4,17 +4,20 @@ import { useMemo } from "react";
 import type { SavingsTransactionDecrypted } from "@/types";
 import { computeSavingsBalance, computeGoalBreakdown } from "@/lib/aggregations";
 import { displayIDR, formatDateWithDay } from "@/lib/format";
-import { categoryColor } from "@/lib/categoryColors";
+import { distinctColors } from "@/lib/categoryColors";
 import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
-import { DonutChart } from "./DonutChart";
 import { AllocationList } from "./AllocationList";
 
 export function SavingsView({ transactions }: { transactions: SavingsTransactionDecrypted[] }) {
   const { hidden } = useBalanceVisibility();
   const balance = useMemo(() => computeSavingsBalance(transactions), [transactions]);
   const goalBreakdown = useMemo(() => computeGoalBreakdown(transactions), [transactions]);
+  const colors = useMemo(
+    () => distinctColors(transactions.map((t) => t.goal)),
+    [transactions]
+  );
   const sorted = useMemo(
     () => [...transactions].sort((a, b) => b.date.localeCompare(a.date)),
     [transactions]
@@ -26,25 +29,14 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
 
       {goalBreakdown.length > 0 && (
         <Panel>
-          <h2 className="mb-6 text-sm font-medium text-[#1A1B1E]">By goal</h2>
-          <DonutChart
-            data={goalBreakdown.map((g) => ({
+          <h2 className="mb-5 text-sm font-medium text-[#1A1B1E]">By goal</h2>
+          <AllocationList
+            items={goalBreakdown.map((g) => ({
               label: g.goal,
               value: g.balance,
-              color: categoryColor(g.goal),
+              color: colors[g.goal],
             }))}
-            centerLabel="Savings"
-            centerValue={displayIDR(balance, hidden)}
           />
-          <div className="mt-6">
-            <AllocationList
-              items={goalBreakdown.map((g) => ({
-                label: g.goal,
-                value: g.balance,
-                color: categoryColor(g.goal),
-              }))}
-            />
-          </div>
         </Panel>
       )}
 
@@ -70,7 +62,7 @@ export function SavingsView({ transactions }: { transactions: SavingsTransaction
                   </span>
                   <span
                     className="shrink-0 rounded-full px-2 py-0.5 text-xs font-medium text-white"
-                    style={{ backgroundColor: categoryColor(t.goal) }}
+                    style={{ backgroundColor: colors[t.goal] }}
                   >
                     {t.goal}
                   </span>

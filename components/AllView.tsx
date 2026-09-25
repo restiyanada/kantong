@@ -9,13 +9,10 @@ import {
   filterByTimeRange,
   type TimeRange,
 } from "@/lib/aggregations";
-import { displayIDR } from "@/lib/format";
-import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 import { TimeRangeTabs } from "./TimeRangeTabs";
 import { NetWorthChart, type NetWorthSeriesConfig } from "./NetWorthChart";
-import { DonutChart } from "./DonutChart";
 import { AllocationList } from "./AllocationList";
 import type {
   DailyTransactionDecrypted,
@@ -48,7 +45,6 @@ export function AllView({
   onSelectDeposito: () => void;
 }) {
   const [range, setRange] = useState<TimeRange>("3M");
-  const { hidden } = useBalanceVisibility();
 
   const dailyBalance = useMemo(
     () => daily.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
@@ -84,23 +80,16 @@ export function AllView({
       <BalanceCard label="Total net worth" balance={breakdown.total} />
 
       <Panel>
-        <h2 className="mb-6 text-sm font-medium text-[#1A1B1E]">Proportion of net worth</h2>
-        <DonutChart
-          data={POCKET_META.map((p) => ({ label: p.label, value: values[p.key], color: p.color }))}
-          centerLabel="Total"
-          centerValue={displayIDR(breakdown.total, hidden)}
+        <h2 className="mb-5 text-sm font-medium text-[#1A1B1E]">Proportion of net worth</h2>
+        <AllocationList
+          items={POCKET_META.map((p) => ({
+            label: p.label,
+            value: values[p.key],
+            color: p.color,
+            icon: p.icon,
+            onClick: p.key === "deposito" ? onSelectDeposito : undefined,
+          }))}
         />
-        <div className="mt-6">
-          <AllocationList
-            items={POCKET_META.map((p) => ({
-              label: p.label,
-              value: values[p.key],
-              color: p.color,
-              icon: p.icon,
-              onClick: p.key === "deposito" ? onSelectDeposito : undefined,
-            }))}
-          />
-        </div>
       </Panel>
 
       <Panel>

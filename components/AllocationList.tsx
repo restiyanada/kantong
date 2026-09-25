@@ -16,7 +16,7 @@ export interface AllocationItem {
 export function AllocationList({ items }: { items: AllocationItem[] }) {
   const { hidden } = useBalanceVisibility();
   const total = items.reduce((sum, i) => sum + Math.max(i.value, 0), 0);
-  const max = Math.max(...items.map((i) => Math.abs(i.value)), 1);
+  const max = Math.max(...items.map((i) => i.value), 1);
 
   if (items.length === 0) {
     return null;
@@ -28,11 +28,15 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
         const Icon = item.icon;
         const hasLimit = item.limit != null && item.limit > 0;
         const overBudget = hasLimit && item.value > item.limit!;
-        const pct = total > 0 ? (Math.max(item.value, 0) / total) * 100 : 0;
+        const negative = item.value < 0;
+        const pct = total > 0 && !negative ? (item.value / total) * 100 : 0;
         const budgetPct = hasLimit ? (item.value / item.limit!) * 100 : 0;
-        const barWidthPct = hasLimit
-          ? Math.min(100, budgetPct)
-          : (Math.abs(item.value) / max) * 100;
+        // A negative pocket can't be a share of the total, so it gets no bar.
+        const barWidthPct = negative
+          ? 0
+          : hasLimit
+            ? Math.min(100, budgetPct)
+            : (item.value / max) * 100;
         const barColor = overBudget ? "#B23B3B" : item.color;
         const Wrapper = item.onClick ? "button" : "div";
         return (
@@ -59,20 +63,28 @@ export function AllocationList({ items }: { items: AllocationItem[] }) {
                   />
                 )}
                 <span className="truncate text-sm font-medium text-[#1A1B1E]">{item.label}</span>
-                <span className="shrink-0 tabular-nums text-sm text-[#8A8C8E]">
-                  {displayIDR(item.value, hidden)}
-                  {hasLimit && ` / ${displayIDR(item.limit!, hidden)}`}
-                </span>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-baseline gap-2">
                 <span
                   className={`tabular-nums text-sm font-semibold ${
-                    overBudget ? "text-[#B23B3B]" : "text-[#1A1B1E]"
+                    (negative && !hidden) || overBudget ? "text-[#B23B3B]" : "text-[#1A1B1E]"
                   }`}
                 >
-                  {hasLimit ? Math.round(budgetPct) : pct.toFixed(2)}%
+                  {displayIDR(item.value, hidden)}
+                  {hasLimit && (
+                    <span className="font-normal text-[#8A8C8E]"> / {displayIDR(item.limit!, hidden)}</span>
+                  )}
                 </span>
-                {item.onClick && <ChevronRight size={15} className="text-[#ADAFAF]" />}
+                {!negative && (
+                  <span
+                    className={`w-9 text-right tabular-nums text-xs ${
+                      overBudget ? "font-medium text-[#B23B3B]" : "text-[#8A8C8E]"
+                    }`}
+                  >
+                    {Math.round(hasLimit ? budgetPct : pct)}%
+                  </span>
+                )}
+                {item.onClick && <ChevronRight size={15} className="self-center text-[#ADAFAF]" />}
               </div>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-[#F0F0EE]">

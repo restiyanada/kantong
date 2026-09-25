@@ -1,6 +1,12 @@
-/** Formats an integer IDR amount as "Rp1,000,000" (PRD section 6). */
+/**
+ * Formats an integer IDR amount the Indonesian way, matching bank apps:
+ * "Rp1.000.000", and "-Rp24.071.324" for negatives. Grouping is done by hand
+ * rather than toLocaleString so server and browser always render the same
+ * string (no hydration mismatch from differing ICU data).
+ */
 export function formatIDR(amount: number): string {
-  return `Rp${amount.toLocaleString("en-US")}`;
+  const digits = String(Math.round(Math.abs(amount))).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${amount < 0 ? "-" : ""}Rp${digits}`;
 }
 
 /** Placeholder shown instead of a real amount when balances are hidden. */

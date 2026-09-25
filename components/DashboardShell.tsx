@@ -61,11 +61,7 @@ export function DashboardShell({
           )}
           {tab === "savings" && <SavingsView transactions={savings} />}
           {tab === "deposito" && (
-            <DepositoView
-              certificates={deposito}
-              todayISO={todayISO}
-              onBack={() => setTab("all")}
-            />
+            <DepositoView certificates={deposito} todayISO={todayISO} />
           )}
         </div>
       </div>

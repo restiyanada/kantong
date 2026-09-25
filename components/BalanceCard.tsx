@@ -17,7 +17,11 @@ export function BalanceCard({
         className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#1E7A5F0D] to-transparent"
       />
       <p className="relative text-sm font-medium text-[#6B6D70]">{label}</p>
-      <p className="relative mt-1.5 text-[2.25rem] font-semibold leading-none tracking-tight tabular-nums text-[#1A1B1E] sm:text-[2.75rem]">
+      <p
+        className={`relative mt-1.5 text-[2.25rem] font-semibold leading-none tracking-tight tabular-nums sm:text-[2.75rem] ${
+          balance < 0 && !hidden ? "text-[#B23B3B]" : "text-[#1A1B1E]"
+        }`}
+      >
         {displayIDR(balance, hidden)}
       </p>
     </div>
