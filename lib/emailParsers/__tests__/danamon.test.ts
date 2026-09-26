@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { parseDanamon } from "../danamon";
 import { isSkip } from "../types";
 
@@ -52,6 +52,34 @@ Nominal Transaksi Rp50.000,00
 Jumlah Rp50.000,00
 `;
 
+// Same template as TRANSFER_BODY (taken from a real email), with the values
+// of a real transfer to the user's mum (name and account number replaced).
+const MUM_TRANSFER_BODY = `
+Transfer ke Rekening Lain Berhasil
+Nasabah Yth.
+Terima kasih telah menggunakan D-Bank PRO. Dengan ini kami informasikan bahwa
+Transfer ke Rekening Lain telah berhasil. Berikut merupakan detail transaksi Anda:
+
+Detail Transaksi
+Status Berhasil
+No. Referensi 2026092520010676931
+Tanggal Transaksi 25 September 2026, 20:01
+Nama Penerima Siti Aminah
+Bank Tujuan BANK RAKYAT INDONESIA
+No. Rekening Penerima 1234567890
+Metode Transfer BI-FAST
+Tujuan Transfer Pemindahan Dana
+
+Detail Nominal
+Nominal Transaksi Rp2.000.000,00
+Jumlah Rp2.000.000,00
+`;
+
+afterEach(() => {
+  delete process.env.OWN_NAME;
+  delete process.env.KNOWN_RECIPIENTS;
+});
+
 describe("parseDanamon", () => {
   it("parses a QRIS payment with unmapped merchant as pending Other", () => {
     const result = parseDanamon(QRIS_SUBJECT, QRIS_BODY);
@@ -66,8 +94,39 @@ describe("parseDanamon", () => {
     expect(result.referenceId).toBe("0624355032649033");
   });
 
-  it("skips a self-transfer entirely, regardless of body content", () => {
-    const result = parseDanamon(TRANSFER_SUBJECT, TRANSFER_BODY);
-    expect(isSkip(result)).toBe(true);
+  it("skips a transfer to the user's own account", () => {
+    process.env.OWN_NAME = "restiyana";
+    expect(isSkip(parseDanamon(TRANSFER_SUBJECT, TRANSFER_BODY))).toBe(true);
+  });
+
+  it("logs a transfer to a KNOWN_RECIPIENTS account under its label", () => {
+    process.env.OWN_NAME = "restiyana";
+    process.env.KNOWN_RECIPIENTS = "1234567890:Mum";
+    const result = parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(2000000);
+    expect(result.date).toBe("2026-09-25");
+    expect(result.note).toBe("Transfer to Mum");
+    expect(result.category).toBe("Other");
+    expect(result.pending).toBe(false);
+    expect(result.referenceId).toBe("2026092520010676931");
+  });
+
+  it("logs a transfer to someone else as a pending expense named after the recipient", () => {
+    process.env.OWN_NAME = "restiyana";
+    const result = parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.note).toBe("Transfer to Siti Aminah");
+    expect(result.pending).toBe(true);
+  });
+
+  it("skips unknown recipients when OWN_NAME isn't configured, rather than guess", () => {
+    expect(isSkip(parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY))).toBe(true);
+  });
+
+  it("still logs a KNOWN_RECIPIENTS transfer without OWN_NAME", () => {
+    process.env.KNOWN_RECIPIENTS = "1234567890:Mum";
+    const result = parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY);
+    expect(result && !isSkip(result) && result.note).toBe("Transfer to Mum");
   });
 });

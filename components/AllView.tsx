@@ -50,7 +50,8 @@ export function AllView({
   const [range, setRange] = useState<TimeRange>("3M");
   const { hidden } = useBalanceVisibility();
 
-  const dailyBalance = useMemo(
+  // All logged income − expenses; computeNetWorth takes out what's parked in Savings/Deposito.
+  const dailyFlow = useMemo(
     () => daily.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
     [daily]
   );
@@ -63,7 +64,7 @@ export function AllView({
     [deposito, todayISO]
   );
 
-  const breakdown = computeNetWorth(dailyBalance, savingsBalance, depositoTotal);
+  const breakdown = computeNetWorth(dailyFlow, savingsBalance, depositoTotal);
   const values: Record<string, number> = {
     daily: breakdown.daily,
     savings: breakdown.savings,
