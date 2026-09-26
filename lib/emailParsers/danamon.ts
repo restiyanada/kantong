@@ -2,6 +2,7 @@ import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseIndonesianDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
 import { decodeHtmlEntities } from "./decodeEntities";
+import { getOwnNamePattern, getKnownRecipient } from "./ownAccountConfig";
 import type { ParseResult } from "./types";
 
 /**
@@ -14,16 +15,23 @@ import type { ParseResult } from "./types";
  *       Nominal   Rp.360.000,00
  *       No. Referensi   0624355032649033
  *
- *  2. "Transfer ke Rekening Lain Berhasil" — a self-transfer between the
- *     user's own accounts, not a real expense. Distinguished purely by
- *     subject line (both shapes can otherwise look similar), so this must
- *     be skipped before ever attempting to parse the body as a purchase.
+ *  2. "Transfer ke Rekening Lain Berhasil" — a transfer out. Salary lands
+ *     in Danamon and is mostly passed on to the user's own BCA/DBS accounts
+ *     (skipped: money isn't spent, just moved), but some goes to other
+ *     people (e.g. family), which is real spending:
+ *       Nama Penerima          Siti Aminah
+ *       No. Rekening Penerima  1234567890
+ *       Nominal Transaksi      Rp2.000.000,00
+ *     A recipient account listed in KNOWN_RECIPIENTS is logged under its
+ *     label. Otherwise the recipient name decides: the user's own name
+ *     (OWN_NAME) is a self-transfer; anyone else is an expense. Without
+ *     OWN_NAME configured we can't tell the two apart, so unknown
+ *     recipients are skipped rather than risk logging the salary split as
+ *     spending.
  */
 export function parseDanamon(subject: string, body: string): ParseResult {
-  if (/transfer ke rekening lain/i.test(subject)) {
-    return { skip: true, reason: "self-transfer, not an expense" };
-  }
-  if (!/pembayaran/i.test(subject)) {
+  const isTransfer = /transfer ke rekening lain/i.test(subject);
+  if (!isTransfer && !/pembayaran/i.test(subject)) {
     return { skip: true, reason: "unrecognized Danamon email type" };
   }
 
@@ -31,6 +39,10 @@ export function parseDanamon(subject: string, body: string): ParseResult {
   if (!statusMatch || !/berhasil/i.test(statusMatch[1])) {
     return { skip: true, reason: "transaction not successful" };
   }
+
+  const referenceId = /No\.\s*Referensi\s+(\S+)/.exec(body)?.[1];
+
+  if (isTransfer) return parseTransfer(body, referenceId);
 
   const amountMatch = /Nominal\s+Rp\.?\s*([\d.,]+)/.exec(body);
   const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
@@ -43,8 +55,6 @@ export function parseDanamon(subject: string, body: string): ParseResult {
   const merchantMatch = /Merchant Tujuan\s+(.+)/.exec(body);
   const merchant = decodeHtmlEntities(merchantMatch ? merchantMatch[1].trim() : "Danamon");
 
-  const referenceMatch = /No\.\s*Referensi\s+(\S+)/.exec(body);
-
   const category = categorizeMerchant(merchant);
 
   return {
@@ -53,6 +63,49 @@ export function parseDanamon(subject: string, body: string): ParseResult {
     pending: category === null,
     note: merchant,
     date,
-    referenceId: referenceMatch?.[1],
+    referenceId,
+  };
+}
+
+function parseTransfer(body: string, referenceId: string | undefined): ParseResult {
+  const recipientMatch = /Nama Penerima\s+(.+)/.exec(body);
+  const recipient = recipientMatch ? decodeHtmlEntities(recipientMatch[1].trim()) : null;
+  const accountMatch = /No\.\s*Rekening Penerima\s+(\d+)/.exec(body);
+  const knownLabel = accountMatch ? getKnownRecipient(accountMatch[1]) : null;
+
+  if (!knownLabel) {
+    const ownNamePattern = getOwnNamePattern();
+    if (!recipient || !ownNamePattern || ownNamePattern.test(recipient)) {
+      return { skip: true, reason: "self-transfer, not an expense" };
+    }
+  }
+
+  const amountMatch = /Nominal Transaksi\s+Rp\.?\s*([\d.,]+)/.exec(body);
+  const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
+  if (!amount) return null;
+
+  const dateMatch = /Tanggal Transaksi\s+(.+)/.exec(body);
+  const date = dateMatch ? parseIndonesianDate(dateMatch[1]) : null;
+  if (!date) return null;
+
+  if (knownLabel) {
+    return {
+      amount,
+      category: "Other",
+      pending: false,
+      note: `Transfer to ${knownLabel}`,
+      date,
+      referenceId,
+    };
+  }
+
+  const category = categorizeMerchant(recipient!);
+  return {
+    amount,
+    category: category ?? "Other",
+    pending: category === null,
+    note: `Transfer to ${recipient}`,
+    date,
+    referenceId,
   };
 }

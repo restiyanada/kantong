@@ -228,12 +228,20 @@ export interface NetWorthBreakdown {
   total: number;
 }
 
+/**
+ * Splits net worth into the three pockets. Savings and Deposito are funded
+ * from the same bank money that income/expenses flow through, so moving
+ * money into them doesn't create wealth: Daily is whatever of the logged
+ * flow (all income − all expenses) isn't currently parked in Savings or
+ * Deposito, and the total is the flow itself. A transfer into Nabung moves
+ * money from Daily to Savings; a matured deposito moves it back.
+ */
 export function computeNetWorth(
-  daily: number,
+  dailyFlow: number,
   savings: number,
   deposito: number
 ): NetWorthBreakdown {
-  return { daily, savings, deposito, total: daily + savings + deposito };
+  return { daily: dailyFlow - savings - deposito, savings, deposito, total: dailyFlow };
 }
 
 export interface GoalBalance {
@@ -310,12 +318,13 @@ export function computeNetWorthOverTime(
       return isOpenByThen && isStillActive ? sum + c.principal : sum;
     }, 0);
 
+    // Same split as computeNetWorth, at each point in time.
     return {
       date,
-      daily: runningDaily,
+      daily: runningDaily - runningSavings - depositoValue,
       savings: runningSavings,
       deposito: depositoValue,
-      total: runningDaily + runningSavings + depositoValue,
+      total: runningDaily,
     };
   });
 }

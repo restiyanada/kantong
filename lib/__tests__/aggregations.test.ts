@@ -303,13 +303,22 @@ describe("depositoBadge", () => {
 });
 
 describe("computeNetWorth", () => {
-  it("sums the three pockets", () => {
-    expect(computeNetWorth(1_000_000, 2_000_000, 20_000_000)).toEqual({
-      daily: 1_000_000,
-      savings: 2_000_000,
-      deposito: 20_000_000,
-      total: 23_000_000,
+  it("takes Savings and Deposito out of Daily, so moving money doesn't change the total", () => {
+    // Payday: +18.6jt salary, -2jt to mum, 11.6jt moved into savings.
+    expect(computeNetWorth(16_600_000, 11_600_000, 0)).toEqual({
+      daily: 5_000_000,
+      savings: 11_600_000,
+      deposito: 0,
+      total: 16_600_000,
     });
+  });
+
+  it("returns a matured deposito's money to Daily", () => {
+    const beforeMaturity = computeNetWorth(40_000_000, 0, 35_000_000);
+    const afterMaturity = computeNetWorth(40_000_000, 0, 0);
+    expect(beforeMaturity.daily).toBe(5_000_000);
+    expect(afterMaturity.daily).toBe(40_000_000);
+    expect(afterMaturity.total).toBe(beforeMaturity.total);
   });
 });
 
