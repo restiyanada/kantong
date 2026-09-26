@@ -15,10 +15,6 @@
  *                          "transfer to your own DBS account" emails are
  *                          actually deposits into a named savings goal
  *                          (e.g. a monthly rent fund), not a no-op shuffle.
- *   KNOWN_RECIPIENTS     = comma-separated "account number:label" pairs,
- *                          e.g. "1234567890:Mum" — people the user
- *                          regularly sends money to, logged as spending
- *                          under that label.
  */
 
 export function getOwnNamePattern(): RegExp | null {
@@ -44,12 +40,3 @@ export function getDbsSavingsGoal(accountSuffix: string): string | null {
   return null;
 }
 
-/** Label for a recipient account number listed in KNOWN_RECIPIENTS, or null. */
-export function getKnownRecipient(accountNumber: string): string | null {
-  const pairs = (process.env.KNOWN_RECIPIENTS ?? "").split(",");
-  for (const pair of pairs) {
-    const [account, label] = pair.split(":").map((part) => part.trim());
-    if (account && label && account === accountNumber) return label;
-  }
-  return null;
-}

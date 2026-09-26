@@ -2,7 +2,7 @@ import { normalizeIDRAmount } from "./normalizeAmount";
 import { parseIndonesianDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
 import { decodeHtmlEntities } from "./decodeEntities";
-import { getOwnNamePattern, getKnownRecipient } from "./ownAccountConfig";
+import { getOwnNamePattern } from "./ownAccountConfig";
 import type { ParseResult } from "./types";
 
 /**
@@ -22,12 +22,10 @@ import type { ParseResult } from "./types";
  *       Nama Penerima          Siti Aminah
  *       No. Rekening Penerima  1234567890
  *       Nominal Transaksi      Rp2.000.000,00
- *     A recipient account listed in KNOWN_RECIPIENTS is logged under its
- *     label. Otherwise the recipient name decides: the user's own name
- *     (OWN_NAME) is a self-transfer; anyone else is an expense. Without
- *     OWN_NAME configured we can't tell the two apart, so unknown
- *     recipients are skipped rather than risk logging the salary split as
- *     spending.
+ *     The recipient name decides: the user's own name (OWN_NAME) is a
+ *     self-transfer; anyone else is an expense. Without OWN_NAME configured
+ *     we can't tell the two apart, so every transfer is skipped rather than
+ *     risk logging the salary split as spending.
  */
 export function parseDanamon(subject: string, body: string): ParseResult {
   const isTransfer = /transfer ke rekening lain/i.test(subject);
@@ -70,14 +68,10 @@ export function parseDanamon(subject: string, body: string): ParseResult {
 function parseTransfer(body: string, referenceId: string | undefined): ParseResult {
   const recipientMatch = /Nama Penerima\s+(.+)/.exec(body);
   const recipient = recipientMatch ? decodeHtmlEntities(recipientMatch[1].trim()) : null;
-  const accountMatch = /No\.\s*Rekening Penerima\s+(\d+)/.exec(body);
-  const knownLabel = accountMatch ? getKnownRecipient(accountMatch[1]) : null;
 
-  if (!knownLabel) {
-    const ownNamePattern = getOwnNamePattern();
-    if (!recipient || !ownNamePattern || ownNamePattern.test(recipient)) {
-      return { skip: true, reason: "self-transfer, not an expense" };
-    }
+  const ownNamePattern = getOwnNamePattern();
+  if (!recipient || !ownNamePattern || ownNamePattern.test(recipient)) {
+    return { skip: true, reason: "self-transfer, not an expense" };
   }
 
   const amountMatch = /Nominal Transaksi\s+Rp\.?\s*([\d.,]+)/.exec(body);
@@ -88,18 +82,7 @@ function parseTransfer(body: string, referenceId: string | undefined): ParseResu
   const date = dateMatch ? parseIndonesianDate(dateMatch[1]) : null;
   if (!date) return null;
 
-  if (knownLabel) {
-    return {
-      amount,
-      category: "Other",
-      pending: false,
-      note: `Transfer to ${knownLabel}`,
-      date,
-      referenceId,
-    };
-  }
-
-  const category = categorizeMerchant(recipient!);
+  const category = categorizeMerchant(recipient);
   return {
     amount,
     category: category ?? "Other",
