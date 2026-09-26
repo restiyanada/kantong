@@ -77,7 +77,6 @@ Jumlah Rp2.000.000,00
 
 afterEach(() => {
   delete process.env.OWN_NAME;
-  delete process.env.KNOWN_RECIPIENTS;
 });
 
 describe("parseDanamon", () => {
@@ -99,34 +98,19 @@ describe("parseDanamon", () => {
     expect(isSkip(parseDanamon(TRANSFER_SUBJECT, TRANSFER_BODY))).toBe(true);
   });
 
-  it("logs a transfer to a KNOWN_RECIPIENTS account under its label", () => {
-    process.env.OWN_NAME = "restiyana";
-    process.env.KNOWN_RECIPIENTS = "1234567890:Mum";
-    const result = parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY);
-    if (!result || isSkip(result)) throw new Error("expected a transaction");
-    expect(result.amount).toBe(2000000);
-    expect(result.date).toBe("2026-09-25");
-    expect(result.note).toBe("Transfer to Mum");
-    expect(result.category).toBe("Other");
-    expect(result.pending).toBe(false);
-    expect(result.referenceId).toBe("2026092520010676931");
-  });
-
   it("logs a transfer to someone else as a pending expense named after the recipient", () => {
     process.env.OWN_NAME = "restiyana";
     const result = parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY);
     if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(2000000);
+    expect(result.date).toBe("2026-09-25");
     expect(result.note).toBe("Transfer to Siti Aminah");
+    expect(result.category).toBe("Other");
     expect(result.pending).toBe(true);
+    expect(result.referenceId).toBe("2026092520010676931");
   });
 
-  it("skips unknown recipients when OWN_NAME isn't configured, rather than guess", () => {
+  it("skips every transfer when OWN_NAME isn't configured, rather than guess", () => {
     expect(isSkip(parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY))).toBe(true);
-  });
-
-  it("still logs a KNOWN_RECIPIENTS transfer without OWN_NAME", () => {
-    process.env.KNOWN_RECIPIENTS = "1234567890:Mum";
-    const result = parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY);
-    expect(result && !isSkip(result) && result.note).toBe("Transfer to Mum");
   });
 });
