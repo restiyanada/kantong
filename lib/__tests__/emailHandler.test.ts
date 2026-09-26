@@ -116,6 +116,7 @@ describe("handleIncomingEmail", () => {
       amount: 3000000,
       note: "DBS transfer",
       pending: false,
+      savings: true,
     });
     expect(createSavingsTransaction).toHaveBeenCalledWith(
       expect.objectContaining({

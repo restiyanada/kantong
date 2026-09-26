@@ -37,7 +37,15 @@ export function DepositoView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <BalanceCard label="Total deposito value" balance={total} />
+      <BalanceCard
+        label="Total deposito value"
+        balance={total}
+        caption={
+          active.length > 0
+            ? `${active.length} active · next matures ${formatMediumDate(active[0].maturityDate)}`
+            : undefined
+        }
+      />
 
       <Panel>
         <h2 className="mb-4 text-sm font-medium text-[#1A1B1E]">Active</h2>

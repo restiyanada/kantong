@@ -9,9 +9,11 @@ async function notify(outcome: EmailOutcome, email: IncomingEmail): Promise<void
   if (!chatId) return;
 
   const text = outcome.logged
-    ? `📧 -${formatIDR(outcome.amount)} — ${outcome.note}${
-        outcome.pending ? " (needs a category)" : ` (${outcome.category})`
-      }`
+    ? outcome.savings
+      ? `📧 +${formatIDR(outcome.amount)} saved to ${outcome.category} — ${outcome.note}`
+      : `📧 -${formatIDR(outcome.amount)} — ${outcome.note}${
+          outcome.pending ? " (needs a category)" : ` (${outcome.category})`
+        }`
     : outcome.notify
       ? `⚠️ Couldn't auto-log an email from ${email.from} — "${email.subject}"`
       : null;

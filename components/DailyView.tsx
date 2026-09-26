@@ -10,7 +10,9 @@ import {
   computeMonthlyTotals,
   type TimeRange,
 } from "@/lib/aggregations";
-import { monthOf, budgetCycleOf, formatMonthLabel, PAYDAY_DAY } from "@/lib/month";
+import { monthOf, shiftMonth, budgetCycleOf, formatMonthLabel, PAYDAY_DAY } from "@/lib/month";
+import { displayIDR } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { categoryColor } from "@/lib/categoryColors";
 import { BalanceCard } from "./BalanceCard";
 import { TimeRangeTabs } from "./TimeRangeTabs";
@@ -44,6 +46,11 @@ export function DailyView({
     () => computeMonthlyTotals(transactions, month),
     [transactions, month]
   );
+  const previousMonthExpense = useMemo(
+    () => computeMonthlyTotals(transactions, shiftMonth(month, -1)).expense,
+    [transactions, month]
+  );
+  const { hidden } = useBalanceVisibility();
   const categoryBreakdown = useMemo(
     () => computeCategoryBreakdown(transactions, month, "expense"),
     [transactions, month]
@@ -65,7 +72,11 @@ export function DailyView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <BalanceCard label="Spending this month" balance={monthlyTotals.expense} />
+      <BalanceCard
+        label={month === monthOf(todayISO) ? "Spending this month" : `Spending in ${formatMonthLabel(month)}`}
+        balance={monthlyTotals.expense}
+        caption={`vs ${displayIDR(previousMonthExpense, hidden)} in ${formatMonthLabel(shiftMonth(month, -1))}`}
+      />
 
       {budgetItems.length > 0 && (
         <Panel>

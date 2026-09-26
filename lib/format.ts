@@ -17,6 +17,12 @@ export function displayIDR(amount: number, hidden: boolean): string {
   return hidden ? MASKED_AMOUNT : formatIDR(amount);
 }
 
+/** Like displayIDR, but with an explicit "+" on positive amounts (for changes, not balances). */
+export function displaySignedIDR(amount: number, hidden: boolean): string {
+  if (hidden) return MASKED_AMOUNT;
+  return amount > 0 ? `+${formatIDR(amount)}` : formatIDR(amount);
+}
+
 /** Breaks a YYYY-MM-DD date into named parts (day/month/year/weekday) per `options`. */
 function dateParts(dateISO: string, options: Intl.DateTimeFormatOptions) {
   const [year, month, day] = dateISO.split("-").map(Number);

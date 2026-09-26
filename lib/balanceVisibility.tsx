@@ -13,17 +13,26 @@ const BalanceVisibilityContext = createContext<{
 export function BalanceVisibilityProvider({ children }: { children: ReactNode }) {
   const [hidden, setHidden] = useState(true);
 
-  // Restore the last choice on load (defaults to visible for first-time users).
+  // Balances start hidden every time the app is opened fresh. The choice is
+  // kept in sessionStorage, not localStorage, so it survives reloads and
+  // switching tabs within a visit but resets to hidden on the next open.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) setHidden(stored === "true");
+    try {
+      const stored = window.sessionStorage.getItem(STORAGE_KEY);
+      if (stored !== null) setHidden(stored === "true");
+    } catch {
+      // Storage unavailable (e.g. private mode): stay hidden.
+    }
   }, []);
 
   const toggle = () => {
     setHidden((prev) => {
       const next = !prev;
-      window.localStorage.setItem(STORAGE_KEY, String(next));
+      try {
+        window.sessionStorage.setItem(STORAGE_KEY, String(next));
+      } catch {
+        // Storage unavailable: the toggle still works for this page view.
+      }
       return next;
     });
   };

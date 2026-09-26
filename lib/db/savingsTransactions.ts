@@ -50,3 +50,18 @@ export async function listSavingsTransactions(): Promise<SavingsTransactionDecry
     return { id: doc.id, ...data, amount: decryptAmount(data.amount) };
   });
 }
+
+/**
+ * Moves every transaction from one goal to another. Renaming onto a goal
+ * that already exists merges the two. Firestore batches cap at 500 writes,
+ * hence the chunking.
+ */
+export async function renameSavingsGoal(from: string, to: string): Promise<void> {
+  const db = getDb();
+  const snap = await db.collection(COLLECTION).where("goal", "==", from).get();
+  for (let i = 0; i < snap.docs.length; i += 500) {
+    const batch = db.batch();
+    for (const doc of snap.docs.slice(i, i + 500)) batch.update(doc.ref, { goal: to });
+    await batch.commit();
+  }
+}

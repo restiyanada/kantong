@@ -319,3 +319,18 @@ export function computeNetWorthOverTime(
     };
   });
 }
+
+/**
+ * How much the net-worth total moved since the start of `todayISO`'s month:
+ * the latest point minus the last point before the 1st (0 if none).
+ */
+export function computeMonthChange(
+  points: Pick<NetWorthPoint, "date" | "total">[],
+  todayISO: string
+): number {
+  if (points.length === 0) return 0;
+  const monthStart = `${todayISO.slice(0, 7)}-01`;
+  const before = points.filter((p) => p.date < monthStart);
+  const baseline = before.length > 0 ? before[before.length - 1].total : 0;
+  return points[points.length - 1].total - baseline;
+}
