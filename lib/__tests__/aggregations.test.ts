@@ -13,6 +13,7 @@ import {
   depositoBadge,
   computeNetWorth,
   computeNetWorthOverTime,
+  computeMonthChange,
 } from "../aggregations";
 import type { DailyTransactionDecrypted, DepositoCertificateDecrypted } from "@/types";
 
@@ -309,5 +310,25 @@ describe("computeNetWorth", () => {
       deposito: 20_000_000,
       total: 23_000_000,
     });
+  });
+});
+
+describe("computeMonthChange", () => {
+  it("measures from the last point before the 1st of this month", () => {
+    const points = [
+      { date: "2026-08-20", total: 100 },
+      { date: "2026-08-31", total: 150 },
+      { date: "2026-09-10", total: 180 },
+      { date: "2026-09-26", total: 120 },
+    ];
+    expect(computeMonthChange(points, "2026-09-26")).toBe(-30);
+  });
+
+  it("counts from zero when everything is in this month", () => {
+    expect(computeMonthChange([{ date: "2026-09-25", total: 500 }], "2026-09-26")).toBe(500);
+  });
+
+  it("is zero with no points", () => {
+    expect(computeMonthChange([], "2026-09-26")).toBe(0);
   });
 });

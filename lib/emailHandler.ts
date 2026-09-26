@@ -12,7 +12,15 @@ export interface IncomingEmail {
 }
 
 export type EmailOutcome =
-  | { logged: true; category: string; amount: number; note: string; pending: boolean }
+  | {
+      logged: true;
+      category: string;
+      amount: number;
+      note: string;
+      pending: boolean;
+      /** Set when the email was a deposit into a Savings goal (`category` holds the goal). */
+      savings?: true;
+    }
   /** `notify: true` only for a genuine failure (couldn't parse at all) — a
    *  duplicate or a deliberate skip (self-transfer, e-wallet top-up) is
    *  expected behavior, not something worth pinging about. */
@@ -68,6 +76,7 @@ export async function handleIncomingEmail(
       amount: result.amount,
       note: result.note,
       pending: false,
+      savings: true,
     };
   }
 

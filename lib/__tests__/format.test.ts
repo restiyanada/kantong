@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { formatIDR, formatShortDate, formatMediumDate, formatDateWithDay } from "../format";
+import { formatIDR, displaySignedIDR, formatShortDate, formatMediumDate, formatDateWithDay } from "../format";
 
 describe("formatIDR", () => {
   it("formats as Rp with Indonesian dot thousand separators", () => {
@@ -9,6 +9,18 @@ describe("formatIDR", () => {
 
   it("puts the minus sign before Rp for negatives", () => {
     expect(formatIDR(-24_071_324)).toBe("-Rp24.071.324");
+  });
+});
+
+describe("displaySignedIDR", () => {
+  it("prefixes + on gains and keeps - on losses", () => {
+    expect(displaySignedIDR(3_000_000, false)).toBe("+Rp3.000.000");
+    expect(displaySignedIDR(-500, false)).toBe("-Rp500");
+    expect(displaySignedIDR(0, false)).toBe("Rp0");
+  });
+
+  it("masks the amount when balances are hidden", () => {
+    expect(displaySignedIDR(3_000_000, true)).toBe("Rp••••••");
   });
 });
 

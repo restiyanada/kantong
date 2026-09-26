@@ -4,11 +4,14 @@ import { useMemo, useState } from "react";
 import { Wallet, PiggyBank, Landmark } from "lucide-react";
 import {
   computeDepositoTotal,
+  computeMonthChange,
   computeNetWorth,
   computeNetWorthOverTime,
   filterByTimeRange,
   type TimeRange,
 } from "@/lib/aggregations";
+import { displaySignedIDR } from "@/lib/format";
+import { useBalanceVisibility } from "@/lib/balanceVisibility";
 import { BalanceCard } from "./BalanceCard";
 import { Panel } from "./Panel";
 import { TimeRangeTabs } from "./TimeRangeTabs";
@@ -45,6 +48,7 @@ export function AllView({
   onSelectDeposito: () => void;
 }) {
   const [range, setRange] = useState<TimeRange>("3M");
+  const { hidden } = useBalanceVisibility();
 
   const dailyBalance = useMemo(
     () => daily.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
@@ -77,7 +81,11 @@ export function AllView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <BalanceCard label="Total net worth" balance={breakdown.total} />
+      <BalanceCard
+        label="Total net worth"
+        balance={breakdown.total}
+        caption={`${displaySignedIDR(computeMonthChange(trendPoints, todayISO), hidden)} this month`}
+      />
 
       <Panel>
         <h2 className="mb-5 text-sm font-medium text-[#1A1B1E]">Proportion of net worth</h2>

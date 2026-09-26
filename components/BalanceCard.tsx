@@ -4,9 +4,12 @@ import { useBalanceVisibility } from "@/lib/balanceVisibility";
 export function BalanceCard({
   label,
   balance,
+  caption,
 }: {
   label: string;
   balance: number;
+  /** One line of context under the number, e.g. "+Rp3.000.000 this month". */
+  caption?: string;
 }) {
   const { hidden } = useBalanceVisibility();
 
@@ -24,6 +27,7 @@ export function BalanceCard({
       >
         {displayIDR(balance, hidden)}
       </p>
+      {caption && <p className="relative mt-2.5 text-sm text-[#8A8C8E]">{caption}</p>}
     </div>
   );
 }

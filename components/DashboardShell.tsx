@@ -59,7 +59,7 @@ export function DashboardShell({
           {tab === "daily" && (
             <DailyView transactions={daily} todayISO={todayISO} budgets={budgets} />
           )}
-          {tab === "savings" && <SavingsView transactions={savings} />}
+          {tab === "savings" && <SavingsView transactions={savings} todayISO={todayISO} />}
           {tab === "deposito" && (
             <DepositoView certificates={deposito} todayISO={todayISO} />
           )}
