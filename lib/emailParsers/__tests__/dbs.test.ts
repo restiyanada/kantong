@@ -123,6 +123,29 @@ nomor rekening berakhiran 6068 pada 10-Jul-2026.
     expect(isSkip(result)).toBe(true);
   });
 
+  it("parses a QRIS purchase dated in an English-only month abbreviation (real bug: 'Oct')", () => {
+    // DBS writes months in English; "Oct" (like May/Aug/Dec) differs from
+    // the Indonesian "Okt" and used to fail the date parse entirely.
+    const realBody =
+      "Hai, RESTIYANA DWI ASTUTI,   Pembayaran QRIS pada tanggal 10 Oct 2026 sebesar Rp2663500 di COLEDERMA berhasil. Berikut adalah rincian transaksinya:   1.Waktu Transaksi (tanggal & jam): 10 Oct 2026 & 14:04:37  2.Status Transaksi: SUCCESS  3.Nama Acquirer: PT Bank Central Asia  4.Nama Merchant: COLEDERMA  5.Lokasi Merchant: JAKARTA SELATID12440  6.Merchant PAN: 9360001430007140244  7.Terminal ID: A2958903  8.Customer PAN: 9360004610010547249  9.Reff ID: 20261010140431720573  10.Total Pembayaran: Rp2663500  11.Tips Amount (jika ada): Rp0  12.Source Of Fund: 1706006653  13.Transaction Type: Pembayaran  14.RRN: 020437384203";
+    const result = parseDBS(SUBJECT_QRIS, realBody);
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(2663500);
+    expect(result.date).toBe("2026-10-10");
+    expect(result.note).toBe("COLEDERMA");
+  });
+
+  it.each([
+    ["May", "05"],
+    ["Aug", "08"],
+    ["Dec", "12"],
+  ])("parses a DBS transfer dated in %s", (mon, mm) => {
+    const body = `Kamu telah berhasil melakukan transfer sebesar Rp 31000 dari rekening yang berakhiran ******6653 ke ******4742 pada 15-${mon}-2026.`;
+    const result = parseDBS(SUBJECT_OTHER_BANK, body);
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
+    expect(result.date).toBe(`2026-${mm}-15`);
+  });
+
   it("returns null for unrecognized body/subject shapes", () => {
     expect(parseDBS("some random subject", "nothing useful here")).toBeNull();
   });

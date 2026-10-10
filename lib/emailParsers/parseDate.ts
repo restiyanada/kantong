@@ -3,14 +3,15 @@ const ENGLISH_MONTHS: Record<string, string> = {
   jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
 };
 
-// BCA writes dates using Indonesian 3-letter abbreviations. Most overlap
-// with English (Jan, Feb, Mar, Apr, Jun, Jul, Sep, Nov), but four don't:
-// Mei/Agu/Okt/Des vs May/Aug/Oct/Dec — those four silently failed to parse
-// under the English-only parser (only ever caught because a July 2026
-// sample happened to share the same abbreviation in both languages).
-const INDONESIAN_MONTH_ABBREV: Record<string, string> = {
-  jan: "01", feb: "02", mar: "03", apr: "04", mei: "05", jun: "06",
-  jul: "07", agu: "08", sep: "09", okt: "10", nov: "11", des: "12",
+// BCA writes 3-letter month abbreviations in Indonesian, DBS in English.
+// Most overlap (Jan, Feb, Mar, Apr, Jun, Jul, Sep, Nov), but four don't:
+// Mei/Agu/Okt/Des vs May/Aug/Oct/Dec. A parser that knows only one language
+// silently fails on those four months for the other bank (only ever caught
+// because samples from overlapping months parsed fine), so accept both.
+const MONTH_ABBREV: Record<string, string> = {
+  jan: "01", feb: "02", mar: "03", apr: "04", mei: "05", may: "05",
+  jun: "06", jul: "07", agu: "08", aug: "08", sep: "09", okt: "10",
+  oct: "10", nov: "11", des: "12", dec: "12",
 };
 
 const INDONESIAN_MONTHS: Record<string, string> = {
@@ -45,16 +46,17 @@ export function parseEnglishAbbrevDate(text: string): string | null {
 }
 
 /**
- * "26 Mei 2026" / "13 Jul 2026" -> "2026-05-26" (BCA — Indonesian 3-letter
- * month abbreviations, not English). Same lookbehind protection as
- * parseEnglishAbbrevDate, for the same reason.
+ * "26 Mei 2026" / "10 Oct 2026" / "25-Sep-2026" -> YYYY-MM-DD (BCA, DBS).
+ * Accepts Indonesian or English 3-letter month abbreviations. Same
+ * lookbehind protection as parseEnglishAbbrevDate, for the same reason.
  */
-export function parseIndonesianAbbrevDate(text: string): string | null {
-  const pattern = Object.keys(INDONESIAN_MONTH_ABBREV).join("|");
-  const re = new RegExp(`(?<!\\d)(\\d{1,2})[\\s-]+(${pattern})[a-z]*[\\s-]+(\\d{2,4})`, "i");  const match = re.exec(text);
+export function parseAbbrevMonthDate(text: string): string | null {
+  const pattern = Object.keys(MONTH_ABBREV).join("|");
+  const re = new RegExp(`(?<!\\d)(\\d{1,2})[\\s-]+(${pattern})[a-z]*[\\s-]+(\\d{2,4})`, "i");
+  const match = re.exec(text);
   if (!match) return null;
   const [, day, monAbbrev, yearRaw] = match;
-  const month = INDONESIAN_MONTH_ABBREV[monAbbrev.toLowerCase()];
+  const month = MONTH_ABBREV[monAbbrev.toLowerCase()];
   if (!month) return null;
   const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
   return `${year}-${month}-${day.padStart(2, "0")}`;

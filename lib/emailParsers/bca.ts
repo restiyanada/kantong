@@ -1,5 +1,5 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
-import { parseIndonesianAbbrevDate, parseDashedDMYDate } from "./parseDate";
+import { parseAbbrevMonthDate, parseDashedDMYDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
 import { decodeHtmlEntities } from "./decodeEntities";
 import { getOwnNamePattern } from "./ownAccountConfig";
@@ -42,9 +42,8 @@ import type { ParseResult } from "./types";
  *     Always logged as an expense — there's no top-up/self-transfer case
  *     for a biller purchase.
  *
- * Dates use Indonesian 3-letter month abbreviations (parseIndonesianAbbrevDate),
- * not English — "Mei"/"Agu"/"Okt"/"Des" differ from "May"/"Aug"/"Oct"/"Dec"
- * and would silently fail to parse under an English-only parser.
+ * Dates use Indonesian 3-letter month abbreviations ("Mei"/"Agu"/"Okt"/"Des"
+ * rather than "May"/"Aug"/"Oct"/"Dec"), parsed by parseAbbrevMonthDate.
  */
 export function parseBCA(body: string): ParseResult {
   const statusMatch = /Status\s*:\s*(.+)/.exec(body);
@@ -113,7 +112,7 @@ function parsePembayaranOrVA(
   if (!amount) return null;
 
   const dateMatch = /Tanggal Transaksi\s*:\s*(.+)/.exec(body);
-  const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
+  const date = dateMatch ? parseAbbrevMonthDate(dateMatch[1]) : null;
   if (!date) return null;
 
   // Most payments have "Pembayaran Ke"; VA transfers that fall through here
@@ -178,7 +177,7 @@ function parseAccountTransfer(
   if (!amount) return null;
 
   const dateMatch = /Tanggal Transaksi\s*:\s*(.+)/.exec(body);
-  const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
+  const date = dateMatch ? parseAbbrevMonthDate(dateMatch[1]) : null;
   if (!date) return null;
 
   const category = categorizeMerchant(recipient);
