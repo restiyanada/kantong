@@ -1,5 +1,5 @@
 import { normalizeIDRAmount } from "./normalizeAmount";
-import { parseDashedDMYDate, parseIndonesianAbbrevDate } from "./parseDate";
+import { parseDashedDMYDate, parseAbbrevMonthDate } from "./parseDate";
 import { categorizeMerchant } from "./merchantMap";
 import { decodeHtmlEntities } from "./decodeEntities";
 import { getOwnAccountAliases, getDbsSavingsGoal } from "./ownAccountConfig";
@@ -96,7 +96,7 @@ function parseOwnAccountTransfer(body: string): DBSParseResult {
   if (!amount) return null;
 
   const dateMatch = /pada\s+(\d{1,2}[\s-]+[A-Za-z]+[\s-]+\d{2,4})/i.exec(body);
-  const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
+  const date = dateMatch ? parseAbbrevMonthDate(dateMatch[1]) : null;
   if (!date) return null;
 
   return {
@@ -114,7 +114,7 @@ function parseDigibankQRIS(body: string): ParseResult {
   if (!amount) return null;
 
   const dateMatch = /Waktu Transaksi[^:]*:\s*(.+?)&/.exec(body);
-  const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
+  const date = dateMatch ? parseAbbrevMonthDate(dateMatch[1]) : null;
   if (!date) return null;
 
   const merchantMatch = /Nama Merchant:\s*(.+?)(?:\s{2,}\d+\.|$)/.exec(body);
@@ -151,7 +151,7 @@ function parseTransferToOtherBank(body: string): ParseResult {
   if (!amount) return null;
 
   const dateMatch = /pada\s+(\d{1,2}[\s-]+[A-Za-z]+[\s-]+\d{2,4})/i.exec(body);
-  const date = dateMatch ? parseIndonesianAbbrevDate(dateMatch[1]) : null;
+  const date = dateMatch ? parseAbbrevMonthDate(dateMatch[1]) : null;
   if (!date) return null;
 
   // Masked destination account suffix, used as a fallback note when there's
