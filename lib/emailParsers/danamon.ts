@@ -74,7 +74,9 @@ function parseTransfer(body: string, referenceId: string | undefined): ParseResu
     return { skip: true, reason: "self-transfer, not an expense" };
   }
 
-  const amountMatch = /Nominal Transaksi\s+Rp\.?\s*([\d.,]+)/.exec(body);
+  // "Nominal Transaksi" for transfers to other banks, plain "Nominal" for
+  // Danamon-to-Danamon ones.
+  const amountMatch = /Nominal(?: Transaksi)?\s+Rp\.?\s*([\d.,]+)/.exec(body);
   const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
   if (!amount) return null;
 
