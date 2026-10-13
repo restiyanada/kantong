@@ -110,6 +110,25 @@ describe("parseDanamon", () => {
     expect(result.referenceId).toBe("2026092520010676931");
   });
 
+  it("reads the amount from a Danamon-to-Danamon transfer, labelled just 'Nominal' (real bug)", () => {
+    process.env.OWN_NAME = "restiyana";
+    const body = `
+Detail Transaksi Status Berhasil
+No. Referensi 2026101322285103574
+Tanggal Transaksi 13 Oktober 2026, 22:28
+Nama Penerima Fliptech Lentera Inspirasi Pertiwi\`pt
+Bank Tujuan BANK DANAMON
+No. Rekening Penerima 003632607762
+Detail Nominal Nominal Rp50.331,00
+Jumlah Rp50.331,00
+`;
+    const result = parseDanamon(TRANSFER_SUBJECT, body);
+    if (!result || isSkip(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(50331);
+    expect(result.date).toBe("2026-10-13");
+    expect(result.note).toBe("Transfer to Fliptech Lentera Inspirasi Pertiwi`pt");
+  });
+
   it("skips every transfer when OWN_NAME isn't configured, rather than guess", () => {
     expect(isSkip(parseDanamon(TRANSFER_SUBJECT, MUM_TRANSFER_BODY))).toBe(true);
   });
