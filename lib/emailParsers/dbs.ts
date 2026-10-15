@@ -12,8 +12,9 @@ import type { ParseResult, DBSParseResult } from "./types";
  *       15-06-2026 15:12:10 Pembelian dari SpotifyID Kartu Debit sebesar
  *       IDR 79.900,00 Info Customer Center 08041500327
  *
- *  2. digibankid@dbs.com — newer "digibank" numbered-list style, three
- *     subject-line shapes distinguished by exact wording:
+ *  2. digibankid@dbs.com — newer "digibank" style, subject-line shapes
+ *     distinguished by exact wording (plus "Isi Ulang PLN Prabayar", see
+ *     parsePlnTopup):
  *       "digibank - Pembayaran QRIS Berhasil"        -> purchase, log it
  *       "digibank - Konfirmasi transfer ke rekening DBS kamu"
  *                                                      -> transfer to the
@@ -46,8 +47,40 @@ export function parseDBS(subject: string, body: string): DBSParseResult {
   if (/pembayaran qris/i.test(subject)) {
     return parseDigibankQRIS(body);
   }
+  if (/isi ulang pln/i.test(subject)) {
+    return parsePlnTopup(body);
+  }
 
   return null; // unrecognized DBS email shape
+}
+
+/**
+ * "digibank - Isi Ulang PLN Prabayar": prepaid electricity token.
+ *   Kamu berhasil melakukan isi ulang token PLN ke ... pada 15-Oct-2026 ...
+ *   - Rp Bayar : Rp104500
+ *   - Nomor referensi transaksi : M63662
+ * "Rp Bayar" is the total charged (token + tax + admin fee). Noted as
+ * "PLN PREPAID", same as BCA's PLN purchases, so both land under Bills.
+ */
+function parsePlnTopup(body: string): DBSParseResult {
+  const amountMatch = /Rp Bayar\s*:\s*Rp\s*([\d.,]+)/i.exec(body);
+  const amount = amountMatch ? normalizeIDRAmount(amountMatch[1]) : null;
+  if (!amount) return null;
+
+  const dateMatch = /pada\s+(\d{1,2}[\s-]+[A-Za-z]+[\s-]+\d{2,4})/i.exec(body);
+  const date = dateMatch ? parseAbbrevMonthDate(dateMatch[1]) : null;
+  if (!date) return null;
+
+  const note = "PLN PREPAID";
+  const category = categorizeMerchant(note);
+  return {
+    amount,
+    category: category ?? "Other",
+    pending: category === null,
+    note,
+    date,
+    referenceId: /Nomor referensi transaksi\s*:\s*(\S+)/i.exec(body)?.[1],
+  };
 }
 
 function parseOldSentenceFormat(body: string): ParseResult {
