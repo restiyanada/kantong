@@ -146,6 +146,40 @@ nomor rekening berakhiran 6068 pada 10-Jul-2026.
     expect(result.date).toBe(`2026-${mm}-15`);
   });
 
+  // Real email (meter owner's name and IDs kept as-is: they're on the
+  // user's own prepaid meter, already in the BCA PLN fixture).
+  const PLN_TOPUP_BODY = `Hai RESTIYANA DWI ASTUTI,
+
+Kamu berhasil melakukan isi ulang token PLN ke ISMAIL DAWALLANG 12 pada 15-Oct-2026 dengan detail berikut:
+- Nomor token                   : 21523920530779787756
+- Rp Bayar                      : Rp104500
+- Rp stroom/ token              : Rp97656
+- Meterai                       : Rp0
+- PPN                           : Rp0
+- PPj                           : Rp2344
+- Angsuran                      : Rp0
+- Biaya admin                   : Rp4500
+- Jumlah KWH                    : 72,3
+- ID pelanggan                  : 547401915804
+- Nomor meter                   : 45085824568
+- Tarif/ Daya                   : R1M/900VA
+- Nomor referensi transaksi PLN : 2XLI25G307973521962
+- Nomor referensi transaksi     : M63662`;
+
+  it.each([
+    ["multi-line", PLN_TOPUP_BODY],
+    ["flattened", PLN_TOPUP_BODY.replace(/\n/g, "  ")],
+  ])("parses a PLN prepaid token top-up (%s body) as a Bills expense", (_, body) => {
+    const result = parseDBS("digibank - Isi Ulang PLN Prabayar", body);
+    if (!result || isSkip(result) || isSavings(result)) throw new Error("expected a transaction");
+    expect(result.amount).toBe(104500); // total paid, not the Rp97656 token value
+    expect(result.date).toBe("2026-10-15");
+    expect(result.note).toBe("PLN PREPAID");
+    expect(result.category).toBe("Bills");
+    expect(result.pending).toBe(false);
+    expect(result.referenceId).toBe("M63662");
+  });
+
   it("returns null for unrecognized body/subject shapes", () => {
     expect(parseDBS("some random subject", "nothing useful here")).toBeNull();
   });
